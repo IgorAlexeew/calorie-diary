@@ -349,6 +349,13 @@
     for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) if (on(i, j)){ ctx.fillStyle = FOOD_COL[m[j][i]] || m[j][i]; ctx.fillRect((x + i) * S, (y + j) * S, S, S); }
   }
 
+  /* constellations as star offsets: a dipper, a "W", a little cross, a triangle */
+  const CONST = [
+    [[0, 2], [3, 1], [6, 2], [9, 3], [10, 6], [14, 7], [13, 4]],
+    [[0, 0], [3, 3], [6, 1], [9, 4], [12, 0]],
+    [[3, 0], [0, 3], [3, 3], [6, 3], [3, 7]],
+    [[0, 5], [5, 0], [9, 6], [4, 3]]
+  ];
   /* little effects drawn in scene space around the pet */
   const ICONS = {
     heart: ["01010", "11111", "11111", "01110", "00100"],
@@ -371,9 +378,19 @@
     const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x * S, y * S, w * S, h * S); };
     R(0, 0, W, H, night ? "#1D2340" : (opts.bg || "#DCE8D5"));
     R(0, Math.max(0, gy - 16), W, 16, night ? "#222A4C" : "#D2E2CB");
-    if (night) for (let k = 0; k < W * gy / 60; k++){ const x = Math.floor(hash(k, 7) * W), y = Math.floor(hash(k, 9) * (gy - 6)); if ((f + k * 5) % 20 > 2) R(x, y, 1, 1, "#F4F1D0"); }
+    if (night){
+      /* a calm night sky: constellations spread over the whole sky, a few lone stars, a crescent moon */
+      const st0 = Math.min(Math.max(0, opts.skyTop || 0), gy - 20), sky = gy - 8 - st0, cells = Math.max(1, Math.round(W / 26)), rows = Math.max(1, Math.round(sky / 22));
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cells; c++){
+        const k = r * cells + c, shape = CONST[k % CONST.length], cw = W / cells, ch = sky / rows;
+        const x0 = Math.floor(c * cw + hash(k, 21) * Math.max(1, cw - 16)), y0 = st0 + Math.floor(r * ch + 2 + hash(k, 22) * Math.max(1, ch - 12));
+        shape.forEach(([a, b], i) => { const tw = (f + i * 7 + k * 3) % 40 < 3; R(x0 + a, y0 + b, 1, 1, tw ? "#8C93B8" : i === 0 ? "#FFF8D6" : "#E8E4C4"); });
+      }
+      for (let k = 0; k < W * sky / 500; k++){ const x = Math.floor(hash(k, 7) * W), y = st0 + Math.floor(hash(k, 9) * sky); if ((f + k * 5) % 30 > 4) R(x, y, 1, 1, "#5E6694"); }
+      const mx = W - 9, my = st0 + 3; [[1,0],[2,0],[3,0],[0,1],[1,1],[0,2],[1,2],[0,3],[1,3],[1,4],[2,4],[3,4]].forEach(([a, b]) => R(mx + a, my + b, 1, 1, "#F4EBC2"));
+    }
     else for (let k = 0; k < Math.max(2, gy / 12); k++){
-      const y = 3 + Math.floor(hash(k, 3) * (gy - 14)), len = 5 + Math.floor(hash(k, 4) * 5), x = ((Math.floor(hash(k, 5) * W) + (f >> 2)) % (W + 14)) - 10;
+      const c0 = Math.min(Math.max(0, opts.skyTop || 0), gy - 20), y = c0 + 3 + Math.floor(hash(k, 3) * (gy - 14 - c0)), len = 5 + Math.floor(hash(k, 4) * 5), x = ((Math.floor(hash(k, 5) * W) + (f >> 2)) % (W + 14)) - 10;
       R(x, y, len, 1, "rgba(255,255,255,.75)"); R(x + 1, y - 1, len - 3, 1, "rgba(255,255,255,.75)");
     }
     for (let x = 0; x < W; x++){ const h = 3 + Math.round(2 * Math.sin(x / 7) + Math.sin(x / 3 + 1)); R(x, gy - h, 1, h, night ? "#28305A" : "#C3D6BA"); }

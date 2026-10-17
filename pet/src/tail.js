@@ -176,8 +176,9 @@ $("#petCv").parentElement.onclick = () => {
       if (cv.width !== W * S || cv.height !== H * S){ cv.width = W * S; cv.height = H * S; cv.style.width = W * S / dpr + "px"; cv.style.height = H * S / dpr + "px"; }
       /* the pet stands a little below the top block, never lower than the free space */
       const sp = $("#petSpace").getBoundingClientRect(), toLog = y => Math.round((y - wr.top) * dpr / S);
-      const ground = Math.max(32, Math.min(H - 2, toLog(sp.bottom), toLog(sp.top) + 38));
-      PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground});
+      const ground = Math.max(32, Math.min(H - 2, toLog(sp.bottom), toLog(sp.top) + 34));
+      const skyTop = toLog($(".topCard").getBoundingClientRect().bottom);
+      PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop});
     }
     const tag = look.stage === "egg" ? "" : (look.toy === "dance" && look.state === "play" ? "Танцует" : STATE_TAG[look.state] || "");
     if (tag !== lastTag){ const t = $("#sceneTag"); t.hidden = !tag; t.textContent = tag; lastTag = tag; }
