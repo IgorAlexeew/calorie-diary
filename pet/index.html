@@ -1377,7 +1377,7 @@ function petOnRender(){
   } else gl.hidden = true;
   /* diary screen: the day's total */
   const dt = totals(dayEntries(cur)), dg = targets(cur);
-  $("#dTotal").textContent = `${label(cur)}: ${dt.kcal} из ${dg.kcal} ккал`;
+  $("#dTotal").textContent = `${dt.kcal} из ${dg.kcal} ккал`;
   /* hatch when there is something to hatch for */
   if (petLoaded && ready && !pet && !hatching && db){
     let recent = false; for (let i = 0; i <= 3; i++) if (isLogged(shift(todayKey(), -i))) recent = true;
@@ -1676,7 +1676,7 @@ function renderLog(entries){
   log.replaceChildren();
   if (!ready){ log.append(el("p",{class:"empty",text:"Загружаю записи…"})); return; }
   if (edit && (edit.day !== cur || !entries.some(e => e.id === edit.id))) closeEditor(true);
-  if (!entries.length){ log.append(el("p",{class:"empty",text: cur === todayKey() ? "За сегодня пока пусто. Опиши, что съел, в поле выше." : "В этот день записей нет."})); return; }
+  if (!entries.length){ log.append(el("p",{class:"empty",text: cur === todayKey() ? "За сегодня пока пусто. Напиши в чат, что съел." : "В этот день записей нет."})); return; }
   for (let m = 0; m < 4; m++){
     const list = entries.filter(e => (+e.meal||0) === m);
     if (!list.length) continue;

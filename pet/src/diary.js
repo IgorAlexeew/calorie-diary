@@ -268,7 +268,7 @@ function renderLog(entries){
   log.replaceChildren();
   if (!ready){ log.append(el("p",{class:"empty",text:"Загружаю записи…"})); return; }
   if (edit && (edit.day !== cur || !entries.some(e => e.id === edit.id))) closeEditor(true);
-  if (!entries.length){ log.append(el("p",{class:"empty",text: cur === todayKey() ? "За сегодня пока пусто. Опиши, что съел, в поле выше." : "В этот день записей нет."})); return; }
+  if (!entries.length){ log.append(el("p",{class:"empty",text: cur === todayKey() ? "За сегодня пока пусто. Напиши в чат, что съел." : "В этот день записей нет."})); return; }
   for (let m = 0; m < 4; m++){
     const list = entries.filter(e => (+e.meal||0) === m);
     if (!list.length) continue;

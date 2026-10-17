@@ -260,7 +260,7 @@ function petOnRender(){
   } else gl.hidden = true;
   /* diary screen: the day's total */
   const dt = totals(dayEntries(cur)), dg = targets(cur);
-  $("#dTotal").textContent = `${label(cur)}: ${dt.kcal} из ${dg.kcal} ккал`;
+  $("#dTotal").textContent = `${dt.kcal} из ${dg.kcal} ккал`;
   /* hatch when there is something to hatch for */
   if (petLoaded && ready && !pet && !hatching && db){
     let recent = false; for (let i = 0; i <= 3; i++) if (isLogged(shift(todayKey(), -i))) recent = true;
