@@ -157,7 +157,39 @@ function localLine(s, st){
   }[stage] || {};
   const R = baby ? {tickle: "Хи-хи-ку! Щекотно-мо!", angry: "Фр-р! Не тыкай моя! Бзз!", shy: "Ой… мо… стесняюсь…"}
     : {tickle: "Ха-ха! Щекотно, хватит!", angry: "Фр! Перестань тыкать.", shy: "Ой… ну ты чего… смущаюсь."};
+  const pk = linePack && linePack.stage === stage && linePack.name === pet.name && linePack.lines[st];
+  if (pk && pk.length) return pk[Math.floor(Math.random() * pk.length)];
   return R[st] || L[st] || L.idle;
+}
+/* ready-made lines for instant moments (taps, pokes, sleep, demo) are written by the AI too, in the pet's own voice,
+   so they don't sound too correct next to the live ones; the fixed lines above are only a fallback */
+const PACK_STATES = {idle:"спокоен, всё нормально", hungry:"голоден", eat:"ест вкусное", sad:"переел, живот тяжёлый", sick:"плохо себя чувствует, хозяин ест не по норме", play:"играет, ему хорошо",
+  sleep:"спит, хозяин тыкает и будит", hibernate:"впал в спячку, хозяин давно не записывал еду", tickle:"хозяин часто тыкает, а ему щекотно", angry:"хозяин часто тыкает, а он злится", shy:"хозяин часто тыкает, а он смущается", happy:"хозяин гладит, ему приятно"};
+let linePack = null, packBusy = false;
+try { linePack = JSON.parse(localStorage.getItem("petLinePack") || "null"); } catch (e) {}
+async function refreshLinePack(){
+  if (!pet || !sample || packBusy) return;
+  const stage = petStage(petAge());
+  if (linePack && linePack.stage === stage && linePack.name === pet.name && linePack.d === todayKey()) return;
+  packBusy = true;
+  const prompt = `Ты — ${pet.name}, 8-битный питомец в дневнике питания хозяина. Характер: ${pet.trait || "добрый и любопытный"}. Если часто тыкать: ${TOUCH[petTouch()].ru}. Стадия: ${STAGE_RU[stage]}.
+Как ты говоришь: ${SPEECH[stage].rule}
+Напиши заготовки реплик хозяину для разных ситуаций, по 3 разные реплики на каждую, каждая не длиннее ${SPEECH[stage].max} символов. Строго в своей манере речи, без цифр, без эмодзи и кавычек. Ситуации:
+${Object.entries(PACK_STATES).map(([k, v]) => `- ${k}: ${v}`).join("\n")}
+Ответь только JSON-объектом вида {"idle":["…","…","…"], "hungry":[…], …} со всеми ключами выше.`;
+  try {
+    const r = await sample.json(prompt, {modelTier:"quick", cache:false});
+    const lines = {};
+    for (const k in PACK_STATES){
+      const a = Array.isArray(r && r[k]) ? r[k] : [];
+      const ok = a.map(x => str(x, SPEECH[stage].max + 20).replace(/^["«„]+|["»“]+$/g, "").split("\n")[0].trim()).filter(Boolean).slice(0, 4);
+      if (ok.length) lines[k] = ok;
+    }
+    if (Object.keys(lines).length >= 6){
+      linePack = {stage, name: pet.name, d: todayKey(), lines};
+      try { localStorage.setItem("petLinePack", JSON.stringify(linePack)); } catch (e) {}
+    }
+  } catch (e) {} finally { packBusy = false; }
 }
 async function requestLine(reason, force){
   if (!pet || !sample || lineBusy || !petStatsNow) return;
@@ -165,7 +197,7 @@ async function requestLine(reason, force){
   if (!force && Date.now() - lineAt < 90000) return;
   lineBusy = true; lineAt = Date.now();
   const s = petStatsNow, st = petState(s), stage = petStage(petAge()), br = petBranch(s, stage);
-  const why = {poke: `хозяин тыкает в тебя уже ${petPokes} раз подряд, а ты ${TOUCH[petTouch()].ru}`, eat:"хозяин только что записал еду", tap:"хозяин тебя погладил", state:"твоё состояние изменилось", open:"хозяин открыл приложение", hatch:"ты только что вылупился"}[reason] || "просто так";
+  const why = {poke: `хозяин тыкает в тебя уже ${petPokes} раз подряд, а ты ${TOUCH[petTouch()].ru}`, eat:"хозяин только что записал еду", tap:"хозяин тебя погладил", state:"твоё состояние изменилось", open:"хозяин открыл приложение", hatch:"ты только что вылупился", wake:"ты спишь, а хозяин тыкает в тебя и будит: ответь сонно, сквозь сон, со звуком храпа"}[reason] || "просто так";
   const prompt = `Ты — ${pet.name}, 8-битный питомец в дневнике питания хозяина. Характер: ${pet.trait || "добрый и любопытный"}. Стадия: ${STAGE_RU[stage]}${br ? ", ветка развития «" + BRANCH_RU[br][0] + "»" : ""}.
 Сейчас ${new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}. Ты ${STATE_RU[st] || "спокоен"}.
 Шкалы от 0 до 100: здоровье ${s.health}, форма ${s.shape}, мышцы ${s.muscle}, настроение ${s.mood}, сытость ${s.food}.
@@ -289,6 +321,7 @@ function petOnRender(){
     if (st !== "eat" && st !== "happy") requestLine(first ? "open" : "state", first || Date.now() - lineAt > 20000);
   }
   if (!pet) setLine(localLine(s, st));
+  else refreshLinePack();
 }
 function petLook(){
   const s = petStatsNow || {fat: 50, muscle: 45};

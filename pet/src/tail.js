@@ -161,14 +161,18 @@ let pokes = [], lastPokeLine = 0;
 $("#petCv").parentElement.onclick = () => {
   if (!pet){ if (!hatching){ petEvt = {state: "idle", until: Date.now() + 800}; setLine(localLine(petStatsNow || {}, "idle")); } return; }
   const st = petStatsNow ? petState(petStatsNow) : "idle";
-  if (st === "sleep" || st === "hibernate"){ setLine(st === "sleep" ? "Хр-р… Не буди, я сплю." : "Хр-р… Запиши еду, и я проснусь."); return; }
+  if (st === "sleep" || st === "hibernate"){
+    const now = Date.now();
+    if (now - lastPokeLine > 8000){ lastPokeLine = now; setLine(localLine(petStatsNow, st)); requestLine("wake", true); }
+    return;
+  }
   /* a single tap is a pat; three or more quick taps get the pet's own reaction */
   const now = Date.now();
   pokes = pokes.filter(t => now - t < 2500); pokes.push(now); petPokes = pokes.length;
   if (pokes.length < 3){ petEvent("happy", 1600); requestLine("tap", now - lineAt > 15000); return; }
   const r = TOUCH[petTouch()];
   petEvent(r.state, 2600);
-  setLine(localLine(petStatsNow, r.state));
+  if (!lineBusy) setLine(localLine(petStatsNow, r.state));
   if (now - lastPokeLine > 5000){ lastPokeLine = now; lineAt = 0; requestLine("poke", true); }
 };
 
