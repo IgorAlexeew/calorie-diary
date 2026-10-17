@@ -1271,26 +1271,61 @@ function petTouch(){
   const k = Object.keys(TOUCH), n = [...String(pet && pet.name || "")].reduce((a, c) => a + c.charCodeAt(0), 0);
   return k[n % k.length];
 }
-/* how the pet talks: a baby babbles, a young one gets most words right, an adult speaks plainly with a little accent */
+/* how the pet talks, like a small child: a baby mangles what is hard to say (р→л, ш→с, «вылез» → «вы-ес»), a young one only a little, an adult speaks plainly with a sound.
+   Grown-up diet words (норма, калории, белок) are never in its mouth: it says ням-ням, мясико, пузико instead */
+const VOCAB = "еда — ням-ням; болит — бо-бо; спать — бай-бай; плохо — кака; нельзя — ай-ай; живот — пузико; мясо, яйца, творог — мясико, яйко, сила; сладкое — сятко; много — многа; вкусно — куфна; спасибо — пасиба; привет — пливет; хочу — хосю; вылез — вы-ес; проснусь — пласнусь; щекотно — сикотна";
 const SPEECH = {
-  baby: {max: 32, rule: "Ты совсем малыш и только учишься говорить: 2–4 слова, путаешь порядок слов и формы («есть хочую», «ты не ням-ням», «много сладкое плохо»), говоришь о себе по имени или «моя», вставляешь звуки-слоги, не только гласные, но и с согласными (мо, ку, фа, пип, мур, бзз, пур-пур, ням). Можешь выдумывать свои словечки, но смысл фразы должен легко угадываться. Никаких цифр и длинных слов."},
-  young: {max: 50, rule: "Ты подросток и говоришь уже почти правильно: короткая фраза до 6 слов, иногда путаешь порядок или окончание, можно один звук-слог или выдуманное словечко (мо, ку, фа, мур, ням), смысл понятен сразу. Можно одну простую цифру."},
-  adult: {max: 80, rule: "Ты взрослый и говоришь понятно: одна фраза до 10 слов, с лёгким звериным акцентом или звуком в начале. Можно одну конкретную деталь дня с цифрой."}
+  baby: {max: 32, rule: `Ты совсем малыш и говоришь как ребёнок, который только учится говорить: 2–4 слова. Коверкаешь всё, что трудно выговорить: Р говоришь как Л, Ш, Ж, Щ — как С и З, сложные стыки согласных упрощаешь («спасибо» — «пасиба», «вкусно» — «куфна», «вылез» — «вы-ес»), длинные слова обрезаешь. Путаешь порядок и формы слов, о себе говоришь «моя» или по имени. Детские слова: ${VOCAB}. Вставляешь странные звуки: уа, агу, иии, пип, мур-р, фыр, хнык, бзз, ку, мо, фа. Смысл должен легко угадываться. Примеры: «Уа… кусать хосю! Ням-ням где?», «Уф… пузико бо-бо. Многа ням.», «Сятко многа — кака. Фыр.», «Мясика мало… сила нету-ку.», «Иии! Сикотна! Хи-хи-ку!», «Бай-бай… мур-р… не буди-и.»`},
+  young: {max: 50, rule: `Ты подросток: говоришь почти правильно, короткая фраза до 6 слов. Р уже выговариваешь, но иногда Ш и Ж говоришь как С и З, путаешь порядок слов или окончание, в конце можешь добавить звук (мур, ку, мо, фа). Иногда детские слова: ням, пузико, мясико, бо-бо. Примеры: «Кусать хочу, где ням?», «Мясика мало сегодня, ку.», «Вкусно было, мур!», «Пузико тяжёлое… многовато ням.»`},
+  adult: {max: 80, rule: "Ты взрослый и говоришь понятно: одна фраза до 10 слов, со звериным звуком в начале (пур, мур, фыр, хрум). Говоришь простыми живыми словами, как зверёк, а не как диетолог. Примеры: «Пур… Ещё можно перекусить, но без сладкого.», «Мур! Мяса бы сегодня побольше.», «Фыр, тяжело в животе. Хватит на сегодня.»"}
 };
+/* words a pet or a child would not say; a line with them is thrown away */
+const BAN = {baby: /норм|калор|ккал|белк|белок|бжу|углевод|жир[аоыу]|дефицит|рацион|порци|грамм|\d/i, young: /норм|калор|ккал|белк|белок|бжу|углевод|дефицит|рацион|порци|грамм|\d/i, adult: /норм|калор|ккал|бжу|углевод|дефицит|рацион/i};
+/* the mangling itself, so the baby always sounds like a baby even when the AI writes too correctly; same word, same mangling */
+function babify(t, stage){
+  if (stage === "adult") return t;
+  const keep = /^(мур+|хр+|фыр+|пур+|бр+|гр+|р+|ура)$/i;
+  return t.replace(/[А-Яа-яЁё]+/g, w => {
+    if (w.length < 3 || keep.test(w) || (pet && w.toLowerCase() === String(pet.name).toLowerCase())) return w;
+    const h = [...w.toLowerCase()].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 1000, 7);
+    let x = w.toLowerCase();
+    if (stage === "baby"){
+      if (h % 10 >= 8) return w;
+      x = x.replace(/^здр/, "др").replace(/^сп/, "п").replace(/^ст/, "т").replace(/^вк/, "к").replace(/^пр/, "пл").replace(/р/g, "л").replace(/[шщ]/g, "с").replace(/ж/g, "з").replace(/ч([уаоюя])/g, (m, v) => "т" + ({у:"ю", а:"я", о:"ё"}[v] || v));
+    } else {
+      if (h % 10 >= 3) return w;
+      x = x.replace(/ш/g, "с").replace(/ж/g, "з");
+    }
+    return w[0] === w[0].toUpperCase() ? x[0].toUpperCase() + x.slice(1) : x;
+  });
+}
+/* a line from the AI, made the pet's own: trimmed, checked for grown-up words, mangled for its age */
+function petSpeak(t, stage, max){
+  t = str(t, max + 30).replace(/^["«„]+|["»“]+$/g, "").split("\n")[0].trim();
+  if (!t || BAN[stage].test(t)) return "";
+  return babify(t, stage);
+}
+/* what the pet knows about the day, said in its own words, without numbers or diet terms */
+function petFacts(s){
+  const eat = !s.eaten ? "хозяин сегодня ещё ничего не ел" : s.left < -150 ? "хозяин сегодня съел больше, чем надо, перебор" : s.left < 150 ? "хозяин сегодня поел как раз сколько надо, больше не нужно" : s.left > s.target * 0.5 ? "хозяин сегодня ел мало, можно ещё хорошо поесть" : "хозяин ещё может немного поесть";
+  const prot = s.eaten && s.p < s.gp * 0.6 ? "; мяса, яиц, творога (сытной еды для силы) сегодня мало" : "";
+  return eat + prot + (s.lastTitle ? `; последняя еда — «${s.lastTitle}», ${fmtH(s.sinceH)} назад` : "");
+}
 function localLine(s, st){
   const slow = a => a[Math.floor(Date.now() / 30000) % a.length];
-  if (!pet) return hatching ? slow(["Крак-крак! Моя вылезай-ку!", "Хрусь… мо… уже скоро-фа!", "Тук-крак! Привет-мо?"])
-    : slow(["Тук… тук… Ням-ням дашь? Вылупка-мо!", "Тук-тук! Ням напиши, моя выйдет-ку.", "Хрусь?.. Ням ждёт моя, мо-мо…"]);
+  if (!pet) return hatching ? slow(["Клак-клак! Моя вылезай-ку!", "Хлусь… мо… узе скоро-фа!", "Тук-клак! Пливет-мо?"])
+    : slow(["Тук… тук… Ням-ням дась? Вылупка-мо!", "Тук-тук! Ням дай — моя вы-ес-ку.", "Хлусь?.. Ням зду моя, мо-мо…"]);
   const stage = petStage(petAge()), baby = stage === "baby";
   const L = {
-    baby: {hibernate: "Хр-р… моя спать долго-мо…", sleep: "Хр-р… мур-мур…", eat: "Ням-ням! Вкусно фа!", hungry: "Пур-пур, есть хочую! Ку?", sad: "Ой. Много ням. Живот бух.",
-      sick: "Моя плохо… пип-пип…", play: "Уи! Играть-ку! Хорошо моя!", idle: s.left > 0 ? "Ням ещё можно. Мо?" : "Хватит ням. Фа-фа."},
-    young: {hibernate: "Хр-р… Еду запиши, я проснусь.", sleep: "Хр-р… До завтра, пур.", eat: "Хрум-хрум! Спасибо вкусно!", hungry: "Ням где? Голодный я.", sad: `Перебор ${-s.left} ккал. Тяжело живот.`,
-      sick: "Плохо мне. Норму давай?", play: "Играю! Хорошо сегодня!", idle: s.left > 0 ? `Ещё ${s.left} ккал можно, ням.` : "Хватит еды сегодня, пур."},
-    adult: {hibernate: "Хр-р… Запиши еду, и я проснусь.", sleep: "Хр-р… До завтра.", eat: "Хрум-хрум! Спасибо!", hungry: "Пур… Где моя еда? Я голоден.", sad: `Перебор на ${-s.left} ккал. Живот тяжёлый…`,
-      sick: "Мне нехорошо. Давай поедим по норме?", play: "Играю! Мне сегодня хорошо.", idle: s.left > 0 ? `До нормы ещё ${s.left} ккал.` : "На сегодня хватит еды."}
+    baby: {hibernate: "Хл-л… долга пью… Ням дай — пласнусь.", sleep: "Бай-бай… мур-р… не буди-и.", eat: "Ням! Куфна-а. Пасиба, мо!", hungry: "Уа… кусать хосю! Ням-ням где?", sad: "Уф… пузико бо-бо. Многа ням.",
+      sick: "Хнык… моя бо-бо…", play: "Иии! Мятик! Игать-ку!", idle: s.left > 0 ? "Ням есё мозна? Мо?" : "Хватит ням. Фа-фа."},
+    young: {hibernate: "Хр-р… Ням запиши, я проснусь.", sleep: "Хр-р… До завтра, пур.", eat: "Хрум-хрум! Вкусно, спасибо!", hungry: "Ням где? Голодный я, ку.", sad: "Пузико тяжёлое… многовато ням.",
+      sick: "Плохо мне, бо-бо. Полегче ешь?", play: "Играю! Хоросо сегодня, мур!", idle: s.left > 0 ? "Ещё поесть можно, ням." : "Хватит еды сегодня, пур."},
+    adult: {hibernate: "Хр-р… Запиши еду, и я проснусь.", sleep: "Хр-р… До завтра.", eat: "Хрум-хрум! Спасибо!", hungry: "Пур… Где моя еда? Я голоден.", sad: "Фыр, тяжело в животе. Хватит на сегодня.",
+      sick: "Мур… Мне нехорошо. Давай полегче?", play: "Играю! Мне сегодня хорошо.", idle: s.left > 0 ? "Пур… Ещё можно перекусить." : "Мур. На сегодня хватит еды."}
   }[stage] || {};
-  const R = baby ? {tickle: "Хи-хи-ку! Щекотно-мо!", angry: "Фр-р! Не тыкай моя! Бзз!", shy: "Ой… мо… стесняюсь…"}
+  const R = baby ? {tickle: "Иии! Сикотна! Хи-хи-ку!", angry: "Фыл! Не тыкай! Бзз!", shy: "Ой… агу… стисняюсь…", happy: "Мур-р… есё, есё!"}
+    : stage === "young" ? {tickle: "Ха-ха! Щекотно, хватит, ку!", angry: "Фыр! Не тыкай меня.", shy: "Ой… ну ты чего… смусаюсь."}
     : {tickle: "Ха-ха! Щекотно, хватит!", angry: "Фр! Перестань тыкать.", shy: "Ой… ну ты чего… смущаюсь."};
   const pk = linePack && linePack.stage === stage && linePack.name === pet.name && linePack.lines[st];
   if (pk && pk.length) return pk[Math.floor(Math.random() * pk.length)];
@@ -1301,7 +1336,7 @@ function localLine(s, st){
 const PACK_STATES = {idle:"спокоен, всё нормально", hungry:"голоден", eat:"ест вкусное", sad:"переел, живот тяжёлый", sick:"плохо себя чувствует, хозяин ест не по норме", play:"играет, ему хорошо",
   sleep:"спит, хозяин тыкает и будит", hibernate:"впал в спячку, хозяин давно не записывал еду", tickle:"хозяин часто тыкает, а ему щекотно", angry:"хозяин часто тыкает, а он злится", shy:"хозяин часто тыкает, а он смущается", happy:"хозяин гладит, ему приятно"};
 let linePack = null, packBusy = false;
-try { linePack = JSON.parse(localStorage.getItem("petLinePack") || "null"); } catch (e) {}
+try { linePack = JSON.parse(localStorage.getItem("petLinePack2") || "null"); } catch (e) {}
 async function refreshLinePack(){
   if (!pet || !sample || packBusy) return;
   const stage = petStage(petAge());
@@ -1309,7 +1344,7 @@ async function refreshLinePack(){
   packBusy = true;
   const prompt = `Ты — ${pet.name}, 8-битный питомец в дневнике питания хозяина. Характер: ${pet.trait || "добрый и любопытный"}. Если часто тыкать: ${TOUCH[petTouch()].ru}. Стадия: ${STAGE_RU[stage]}.
 Как ты говоришь: ${SPEECH[stage].rule}
-Напиши заготовки реплик хозяину для разных ситуаций, по 3 разные реплики на каждую, каждая не длиннее ${SPEECH[stage].max} символов. Строго в своей манере речи, без цифр, без эмодзи и кавычек. Ситуации:
+Напиши заготовки реплик хозяину для разных ситуаций, по 3 разные реплики на каждую, каждая не длиннее ${SPEECH[stage].max} символов. Строго в своей манере речи, без цифр, без эмодзи и кавычек. Никогда не говори взрослых слов про диету: норма, калории, белок, жиры, углеводы, порция. Ситуации:
 ${Object.entries(PACK_STATES).map(([k, v]) => `- ${k}: ${v}`).join("\n")}
 Ответь только JSON-объектом вида {"idle":["…","…","…"], "hungry":[…], …} со всеми ключами выше.`;
   try {
@@ -1317,12 +1352,12 @@ ${Object.entries(PACK_STATES).map(([k, v]) => `- ${k}: ${v}`).join("\n")}
     const lines = {};
     for (const k in PACK_STATES){
       const a = Array.isArray(r && r[k]) ? r[k] : [];
-      const ok = a.map(x => str(x, SPEECH[stage].max + 20).replace(/^["«„]+|["»“]+$/g, "").split("\n")[0].trim()).filter(Boolean).slice(0, 4);
+      const ok = a.map(x => petSpeak(x, stage, SPEECH[stage].max)).filter(Boolean).slice(0, 4);
       if (ok.length) lines[k] = ok;
     }
     if (Object.keys(lines).length >= 6){
       linePack = {stage, name: pet.name, d: todayKey(), lines};
-      try { localStorage.setItem("petLinePack", JSON.stringify(linePack)); } catch (e) {}
+      try { localStorage.setItem("petLinePack2", JSON.stringify(linePack)); } catch (e) {}
     }
   } catch (e) {} finally { packBusy = false; }
 }
@@ -1335,15 +1370,15 @@ async function requestLine(reason, force){
   const why = {poke: `хозяин тыкает в тебя уже ${petPokes} раз подряд, а ты ${TOUCH[petTouch()].ru}`, eat:"хозяин только что записал еду", tap:"хозяин тебя погладил", state:"твоё состояние изменилось", open:"хозяин открыл приложение", hatch:"ты только что вылупился", wake:"ты спишь, а хозяин тыкает в тебя и будит: ответь сонно, сквозь сон, со звуком храпа"}[reason] || "просто так";
   const prompt = `Ты — ${pet.name}, 8-битный питомец в дневнике питания хозяина. Характер: ${pet.trait || "добрый и любопытный"}. Стадия: ${STAGE_RU[stage]}${br ? ", ветка развития «" + BRANCH_RU[br][0] + "»" : ""}.
 Сейчас ${new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}. Ты ${STATE_RU[st] || "спокоен"}.
-Шкалы от 0 до 100: здоровье ${s.health}, форма ${s.shape}, мышцы ${s.muscle}, настроение ${s.mood}, сытость ${s.food}.
-Сегодня хозяин съел ${s.eaten} из ${s.target} ккал, белок ${s.p} из ${s.gp} г${s.lastTitle ? `, последняя еда — «${s.lastTitle}» ${fmtH(s.sinceH)} назад` : ", еды сегодня ещё не было"}. Дней подряд с записями: ${s.streak}.
+Как ты себя чувствуешь: здоровье ${s.health > 60 ? "хорошее" : s.health > 30 ? "так себе" : "плохое"}, настроение ${s.mood > 60 ? "хорошее" : s.mood > 30 ? "среднее" : "плохое"}, сытость ${s.food > 60 ? "сыт" : s.food > 30 ? "немного голоден" : "голоден"}.
+Что ты знаешь про день: ${petFacts(s)}. Дней подряд с записями: ${s.streak}.
 Повод для реплики: ${why}.
 Как ты говоришь: ${SPEECH[stage].rule}
-Напиши одну реплику питомца хозяину, по-русски, не длиннее ${SPEECH[stage].max} символов. Живо, с характером, по-доброму, по поводу и по тому, что важно сейчас (голоден, перебор, мало белка, вкусно). Без эмодзи, кавычек и хэштегов. Ответь только репликой.`;
+Напиши одну реплику питомца хозяину, по-русски, не длиннее ${SPEECH[stage].max} символов. Живо, с характером, по-доброму, по поводу и по тому, что важно сейчас (голоден, переел, мало сытной еды, вкусно). Никогда не говори взрослых слов про диету: норма, калории, ккал, белок, БЖУ, порция, и без цифр. Без эмодзи, кавычек и хэштегов. Ответь только репликой.`;
   setLine($("#petSayText").textContent, true);
   try {
     const r = await sample(prompt, {modelTier:"quick", cache:false});
-    const t = str(r && r.text, SPEECH[stage].max + 30).replace(/^["«„]+|["»“]+$/g, "").split("\n")[0].trim();
+    const t = petSpeak(r && r.text, stage, SPEECH[stage].max);
     setLine(t || localLine(s, st));
   } catch (e) {
     setLine(localLine(s, st));
@@ -1357,7 +1392,7 @@ async function genPetAI(parts){
   const prompt = `Ты придумываешь характер 8-битному питомцу из игры-дневника питания. Детали уже выпали случайно:
 тело ${parts.body}, уши или макушка ${parts.ears}, глаза ${parts.eyes}, рот ${parts.mouth}, хвост ${parts.tail}, узор ${parts.pattern}, цвет ${parts.palette}.
 Придумай имя, которое подходит к этому облику, характер и первую фразу. Случайное число для разнообразия: ${Math.floor(Math.random() * 1e6)}.
-Ответь только JSON: {"name":"короткое русское имя, одно слово до 10 букв, можно съедобное","trait":"характер, 3–6 слов","touch":"как реагирует, если его часто тыкать: ticklish (щекотно), grumpy (сердится), shy (смущается) или cuddly (радуется); подбери под характер","greeting":"первая фраза хозяину, как говорит только что вылупившийся малыш: 2–4 слова, ломаная речь, звук вроде пур-пур или уи"}`;
+Ответь только JSON: {"name":"короткое русское имя, одно слово до 10 букв, можно съедобное","trait":"характер, 3–6 слов","touch":"как реагирует, если его часто тыкать: ticklish (щекотно), grumpy (сердится), shy (смущается) или cuddly (радуется); подбери под характер","greeting":"первая фраза хозяину, как говорит только что вылупившийся малыш: 2–4 слова, коверкает слова как ребёнок (Р как Л, Ш как С), звук вроде уа, агу, пип. Пример: Уа! Я вы-ес! Пливет-мо!"}`;
   const r = await sample.json(prompt, {modelTier:"quick", cache:false});
   return r && typeof r === "object" ? cleanPet({...parts, name: r.name, trait: r.trait, greeting: r.greeting, touch: r.touch}) : null;
 }
@@ -1388,7 +1423,7 @@ async function hatchPet(){
   pet = {...p, born, gen, created: new Date().toISOString()};
   hatching = null;
   petEvent("happy", 3000);
-  setLine(p.greeting || `Уи! ${p.name} моя. Ням дашь?`);
+  setLine(babify(p.greeting || `Уа! ${p.name} моя. Ням дась?`, "baby"));
   lineAt = Date.now();
   petOnRender();
   enqueue(() => db.collection("pet").doc("current").set(pet));
