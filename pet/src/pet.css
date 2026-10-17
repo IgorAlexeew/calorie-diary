@@ -144,6 +144,7 @@ select{background-image:none;border:2px solid var(--line);padding-right:12px}
 .pmInfo dt{font-family:var(--display);font-size:16px;color:var(--muted)}
 .pmInfo dd{margin:0}
 .pmDemo{display:flex;flex-wrap:wrap;gap:8px}
+.pmDemo button.on{background:var(--fg);color:var(--bg)}
 .pmDemo button{font:600 16px var(--display);border:2px solid var(--line);background:var(--surface);color:var(--fg);box-shadow:2px 2px 0 var(--line);padding:6px 10px}
 svg text{font-size-adjust:.5!important}
 

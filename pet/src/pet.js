@@ -1,6 +1,6 @@
 /* ---------- the pet: stats from the diary, its state, AI lines, hatching ---------- */
 let pet = null, petLoaded = false, hatching = null;
-let petDemo = null, petEvt = null, petStatsNow = null;
+let petDemo = null, petEvt = null, petStatsNow = null, petLookDemo = null;
 const STAT_DEFS = [
   {k:"health", label:"Здоровье",   icon:"heart",    c:"var(--s-health)"},
   {k:"shape",  label:"Форма",      icon:"scale",    c:"var(--s-shape)"},
@@ -269,5 +269,7 @@ function petLook(){
     return {pet: {palette: hatching ? hatching.palette : "mint"}, look: {stage: "egg", crack, state: "idle"}};
   }
   const st = petStatsNow ? petState(s) : "idle", stage = petStage(petAge());
-  return {pet, look: {state: st, fat: s.fat, muscle: s.muscle, branch: petBranch(s, stage), stage: stage === "baby" ? "baby" : "", toy: petToy()}};
+  const look = {state: st, fat: s.fat, muscle: s.muscle, branch: petBranch(s, stage), stage, toy: petToy()};
+  if (petLookDemo) Object.assign(look, petLookDemo);
+  return {pet, look};
 }

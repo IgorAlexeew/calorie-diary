@@ -33,49 +33,46 @@
   const gray = c => { const n = parseInt(c.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255, v = Math.round(r * .3 + g * .59 + b * .11); const m = (a) => Math.round(a * .45 + v * .55); return "#" + [m(r), m(g), m(b)].map(x => x.toString(16).padStart(2, "0")).join(""); };
   const tint = (c, t) => { const n = parseInt(c.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255, T = [150, 190, 90]; return "#" + [r, g, b].map((x, i) => Math.round(x * .6 + T[i] * .4).toString(16).padStart(2, "0")).join(""); };
 
-  function inside(shape, dx, dy, x){
-    switch (shape){
-      case "egg": { const k = 1 + 0.28 * Math.max(0, -dy); return (dx * k) ** 2 + dy * dy <= 1; }
-      case "pear": { const k = 1 + 0.55 * Math.max(0, -dy); return (dx * k) ** 2 + dy * dy <= 1; }
-      case "square": return dx ** 4 + dy ** 4 <= 1;
-      case "ghost": return dy < 0 ? dx * dx + dy * dy <= 1 : Math.abs(dx) <= 0.98 && dy <= 0.8 + (x % 3 === 0 ? 0.2 : 0);
-      case "blob": { const a = Math.atan2(dy, dx); return dx * dx + dy * dy <= 1 + 0.1 * Math.sin(a * 3 + 1); }
-      default: return dx * dx + dy * dy <= 1;
-    }
-  }
-
-  /* ---------- the pet is assembled from parts ----------
-     The body is a silhouette; ears, tail, arms and feet are small pixel templates hooked to anchor points
-     found on the body's real outline, so every part stays attached whatever the body's shape and size.
-     Animation moves parts, not the picture: the body breathes, ears twitch, the tail wags, arms change pose,
-     feet step, eyes blink and change expression, the mouth chews.
-     Template letters: m main, l light, d dark, o outline, k eye ink, w white, p pink, r mouth red,
-     c horn cream, g leaf, G stem; "." is empty. Left-side parts are drawn and mirrored to the right. */
+  /* ---------- the pet is a baby drawing that grows ----------
+     Every body starts as a hand-made baby silhouette: a list of half-widths, one per row, always symmetric.
+     Growing up never shrinks anything: rows are added in the middle and the sides widen (fat widens the belly).
+     Parts hook onto that silhouette: ears and the tail behind it, arms at the shoulders and feet under the belly
+     drawn in front with their own outline so they read as limbs, the face at a fixed spot on the head.
+     Animation moves the parts: the body breathes (one middle row in and out), arms swing in turns, feet step,
+     the tail wags, ears twitch, leaves flutter, eyes blink, the mouth chews, a sleep bubble grows and pops.
+     Template letters: m main, l light, d dark, o outline, k eye ink, w white, r mouth red,
+     c horn cream, g leaf, G stem; "." is empty. Templates are drawn for the left side and mirrored. */
+  const BODY = {
+    round:  [2, 4, 5, 5, 6, 6, 6, 6, 6, 5, 4],
+    egg:    [2, 3, 4, 4, 5, 5, 6, 6, 6, 5, 4],
+    pear:   [3, 4, 4, 5, 5, 6, 6, 7, 7, 7, 6],
+    square: [5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5],
+    ghost:  [2, 4, 5, 5, 6, 6, 6, 6, 6, 6, 6],
+    blob:   [3, 5, 6, 6, 7, 7, 7, 7, 7, 6, 5]
+  };
   const T = {
     ear: {
-      cat:     {px: 2, py: 3, rows: ["m...", "mm..", "mlm.", "mmmm"]},
-      bunny:   {px: 1, py: 6, rows: [".m.", "mlm", "mlm", "mlm", "mlm", "mmm", "mmm"]},
-      bear:    {px: 2, py: 2, rows: [".mm.", "mllm", "mmmm"]},
-      horns:   {px: 1, py: 2, rows: ["c.", "cc", ".c"]}
+      cat:   {px: 0, py: 3, rows: ["m..", "mm.", "mlm", "mmm"]},
+      bunny: {px: 1, py: 5, rows: [".m.", "mlm", "mlm", "mlm", "mlm", "mmm"]},
+      bear:  {px: 1, py: 2, rows: [".m.", "mlm", "mmm"]},
+      horns: {px: 1, py: 2, rows: ["c.", "cc", ".c"]}
     },
     top: {
-      antenna: {px: 0, py: 4, rows: ["ll", "ll", "o.", "o.", "o."]},
-      sprout:  {px: 2, py: 3, rows: ["gg.gg", ".gGg.", "..G..", "..G.."]}
+      antenna: [["ll", "ll", "oo", "oo"], ["ll", "ll", "oo", "oo"]],
+      sprout:  [["gg..gg", ".gggg.", "..GG..", "..GG.."], [".g..g.", "gggggg", "..GG..", "..GG.."]]
     },
     tail: {
-      curl:   {px: 0, py: 2, rows: ["..mm", ".m.m", "mm.."]},
-      fluff:  {px: 0, py: 2, rows: [".ll.", "mllm", "mmlm", ".mm."]},
-      spikes: {px: 0, py: 2, rows: ["..d", ".dm", "mmm"]}
+      curl:   [{px: 0, py: 3, rows: ["..mm", "...m", "...m", "mmm."]}, {px: 0, py: 2, rows: ["...mm", "....m", "mmmm."]}],
+      fluff:  [{px: 0, py: 3, rows: ["..ll", ".lll", "mml.", "mm.."]}, {px: 0, py: 2, rows: ["..lll", "mmlll", "mmm.."]}],
+      spikes: [{px: 0, py: 3, rows: ["...d", "..dm", ".dm.", "mm.."]}, {px: 0, py: 2, rows: ["...dd", ".ddm.", "mmm.."]}]
     },
     arm: {
-      down:   {px: 0, py: 0, rows: ["m", "m", "m"]},
-      downS:  {px: 0, py: 0, rows: ["mm", "mm", "mm"]},
-      up:     {px: 0, py: 2, rows: [".m", "mm", "m."]},
-      upS:    {px: 0, py: 2, rows: [".mm", "mmm", "mm."]},
-      out:    {px: 0, py: 0, rows: ["mm", ".m"]},
-      outS:   {px: 0, py: 0, rows: ["mmm", ".mm"]}
+      down:  {px: 1, py: 0, rows: ["mm", "mm", "mm"]},
+      swing: {px: 1, py: -1, rows: ["mm", "mm", "mm"]},
+      up:    {px: 2, py: 2, rows: ["mm.", "mm.", ".mm"]},
+      out:   {px: 2, py: 0, rows: ["mmm", "mmm"]},
+      belly: {px: 0, py: 0, rows: ["mm.", ".mm"]}
     },
-    foot: {px: 1, py: 0, rows: ["ddd"]},
     eye: {
       dot:    ["k", "k"],
       big:    ["kw", "kk"],
@@ -97,124 +94,157 @@
     }
   };
   const SOLID = "mldcgG";
+  /* the silhouette for today: the baby profile grown by stage, fat and branch */
+  function grow(shape, stage, fat, br, squash){
+    let hw = (BODY[shape] || BODY.round).slice();
+    const mid = Math.floor(hw.length * .55);
+    const add = stage === "adult" ? 3 : stage === "young" ? 2 : 0;
+    for (let k = 0; k < add; k++) hw.splice(mid, 0, hw[mid]);
+    const up = stage === "adult" ? 2 : stage === "young" ? 1 : 0;
+    const belly = Math.max(-1, Math.min(2, Math.round((fat - 50) / 25))) + (br === "donut" ? 2 : 0) - (br === "slim" ? 1 : 0);
+    hw = hw.map((w, i) => {
+      let v = w + (i > 0 ? up : 0);
+      if (i >= hw.length * .4) v += belly;
+      return Math.max(2, v);
+    });
+    if (squash){ hw.splice(mid, 1); hw = hw.map((w, i) => i >= mid - 1 ? w + 1 : w); }
+    return hw;
+  }
   function sprite(pet, look, f){
     const G = 32, MIR = x => G - 1 - x;
     const px = Array.from({length: G}, () => Array(G).fill(null));
     const solid = Array.from({length: G}, () => Array(G).fill(false));
+    const part = Array.from({length: G}, () => Array(G).fill(false));
     let [main, light, dark] = PALETTES[pet.palette] || PALETTES.mint;
-    const st = look.state || "idle", br = look.branch || "", baby = look.stage === "baby";
+    const st = look.state || "idle", br = look.branch || "", stage = look.stage || "baby", baby = stage === "baby";
     if (br === "grump"){ main = gray(main); light = gray(light); dark = gray(dark); }
     if (st === "sick"){ main = tint(main); light = tint(light); }
-    const COL = {m: main, l: light, d: dark, o: OUT, k: OUT, w: "#FFFFFF", p: "#F59AB0", r: "#B0303C", c: "#F2E8CF", g: "#6CC24A", G: "#3E8E3A"};
-    const put = (x, y, ch, isSolid) => { if (x < 0 || y < 0 || x >= G || y >= G || ch === ".") return; px[y][x] = COL[ch] || ch; if (isSolid) solid[y][x] = true; };
-    /* a template placed so that its pivot lands on (ax, ay); mirrored for the right side */
-    function stamp(t, ax, ay, mirror, front){
-      t.rows.forEach((row, j) => [...row].forEach((ch, i) => {
-        if (ch === ".") return;
-        const x = mirror ? ax + (t.px - i) : ax + (i - t.px), y = ay + (j - t.py);
-        if (!front && solid[y] && solid[y][x] && body[y][x]) return; /* parts behind the body stay behind */
-        put(x, y, ch, SOLID.includes(ch));
+    const COL = {m: main, l: light, d: dark, o: OUT, k: OUT, w: "#FFFFFF", r: "#B0303C", c: "#F2E8CF", g: "#6CC24A", G: "#3E8E3A"};
+    const inG = (x, y) => x >= 0 && y >= 0 && x < G && y < G;
+    const put = (x, y, ch, isSolid) => { if (!inG(x, y) || ch === ".") return; px[y][x] = COL[ch] || ch; if (isSolid) solid[y][x] = true; };
+    /* a template with its pivot on (ax, ay); mirror draws the right-side copy */
+    function cells(t, ax, ay, mirror){
+      const out = [];
+      t.rows.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== ".") out.push([mirror ? ax + (t.px - i) : ax + (i - t.px), ay + (j - t.py), ch]); }));
+      return out;
+    }
+    const behind = c => c.forEach(([x, y, ch]) => put(x, y, ch, true));
+    /* a limb in front of the body: its own outline keeps it readable over the belly */
+    function limb(c, overBody){
+      c.forEach(([x, y, ch]) => { if (inG(x, y)){ put(x, y, ch, true); part[y][x] = true; } });
+      c.forEach(([x, y]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([a, b]) => {
+        const X = x + a, Y = y + b;
+        if (!inG(X, Y) || part[Y][X]) return;
+        if (!overBody && body[Y][X]) return;
+        px[Y][X] = OUT;
       }));
     }
 
-    /* motion of the whole pet and of the body alone */
+    /* motion */
     const fat = look.fat == null ? 50 : look.fat, mus = look.muscle == null ? 40 : look.muscle;
-    let jump = 0, sway = 0;
-    if (st === "happy") jump = [0, -2, -3, -2, 0, 0][f % 6];
-    if (st === "play" && look.toy !== "dance") jump = [0, -1, -2, -1, 0, 0][f % 6];
+    let jump = 0, sway = 0, squash = false;
+    if (st === "happy"){ jump = [0, -2, -3, -2, 0, 0][f % 6]; squash = f % 6 === 4; }
+    if (st === "play" && look.toy !== "dance"){ jump = [0, -1, -2, -1, 0, 0][f % 6]; squash = f % 6 === 4; }
     if (st === "play" && look.toy === "dance") sway = [-1, -1, 0, 1, 1, 0][f % 6];
     if (st === "sick") sway = [0, 0, 1, 1, 0, 0, -1, -1][f % 8];
-    const breathe = (st === "idle" || st === "hungry" || st === "sad") ? (f >> 1) % 2 : st === "sleep" ? (f >> 2) % 2 : 0;
-
-    /* the body silhouette */
-    const sc = baby ? 0.8 : 1;
-    let rx = (7.5 + (fat - 50) / 50 * 3) * sc, ry = (baby ? 6 : 7.5);
-    if (br === "slim") rx = 5.5 * sc;
-    if (br === "donut") rx = 10.5 * sc;
+    if (["idle", "hungry", "sad", "sick"].includes(st)) squash = (f >> 2) % 2 === 1;
+    if (st === "sleep" || st === "hibernate") squash = (f >> 3) % 2 === 1;
     const lying = st === "hibernate";
-    if (lying) ry -= 1;
-    const bottom = 28 + jump, cx = 16 + sway;
-    const cy = bottom - ry + 0.5 + breathe * 0.5;
+
+    /* the body */
+    const hw = grow(pet.body, stage, fat, br, squash), H = hw.length;
+    const footH = baby ? 1 : 2;
+    const bot = 28 - footH + jump - (lying ? -footH : 0), top = bot - H + 1;
     const body = Array.from({length: G}, () => Array(G).fill(false));
-    for (let y = 0; y < G; y++) for (let x = 0; x < G; x++){
-      const dx = (x + .5 - cx) / rx, dy = (y + .5 - cy) / ry;
-      if (y <= bottom && inside(pet.body, dx, dy, x)) body[y][x] = true;
-    }
-    const rowsOf = x => { const r = []; for (let y = 0; y < G; y++) if (body[y][x]) r.push(y); return r; };
-    const colsOf = y => { const c = []; for (let x = 0; x < G; x++) if (body[y] && body[y][x]) c.push(x); return c; };
-    const topAt = x => { const r = rowsOf(x); return r.length ? r[0] : null; };
-    const botAt = x => { const r = rowsOf(x); return r.length ? r[r.length - 1] : null; };
-    let top = G, bot = 0, left = G, right = 0;
-    for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) if (body[y][x]){ top = Math.min(top, y); bot = Math.max(bot, y); left = Math.min(left, x); right = Math.max(right, x); }
-    const cl = Math.floor(cx - .5), cr = MIR(cl) + (cx - 16) * 2; /* the two middle columns */
-    const H = bot - top + 1, Wd = right - left + 1;
-
-    /* behind the body: feet, tail, ears */
-    if (!lying){
-      const fx = Math.max(2, Math.round(Wd * 0.22));
-      for (const s of [-1, 1]){
-        const x = s < 0 ? cl - fx + 1 : cr + fx - 1;
-        const b = botAt(x) == null ? bot : botAt(x);
-        const step = look.moving && ((f >> 1) % 2 === (s < 0 ? 0 : 1)) ? -1 : 0;
-        stamp(T.foot, x, Math.min(29 + jump, b + 1) + step, s > 0, false);
+    const L = (i) => 16 - hw[i] + sway, R = (i) => 15 + hw[i] + sway; /* first and last column of a row */
+    for (let i = 0; i < H; i++){
+      const y = top + i; if (y < 0 || y >= G) continue;
+      for (let x = L(i); x <= R(i); x++){
+        if (pet.body === "ghost" && i === H - 1 && (x - sway) % 3 === 0) continue;
+        if (inG(x, y)) body[y][x] = true;
       }
     }
+    const rowAt = r => Math.max(0, Math.min(H - 1, Math.round(r)));
+
+    /* behind the body: tail and ears */
     if (T.tail[pet.tail]){
-      const ty = Math.round(cy + ry * 0.35), cols = colsOf(ty);
-      const wag = st === "happy" || st === "play" ? f % 2 : st === "idle" ? (f >> 2) % 2 : 0;
-      if (cols.length) stamp(T.tail[pet.tail], cols[cols.length - 1] + 1, ty - wag, false, false);
+      const i = H - 2, wag = st === "happy" || st === "play" ? f % 2 : (st === "idle" || st === "eat") ? (f >> 2) % 2 : 0;
+      behind(cells(T.tail[pet.tail][wag], R(i), top + i, false));
     }
-    const earDef = T.ear[pet.ears];
-    if (earDef){
-      /* ears sit on the head's own width a few rows down, so narrow tops (pear, egg) keep them apart */
-      const tw = colsOf(top + 2).length || Wd;
-      const ex = Math.max(2, Math.round(tw * ({bunny: .3, horns: .28, cat: .42, bear: .45}[pet.ears] || .4)));
+    const ear = T.ear[pet.ears];
+    if (ear){
+      /* each ear stands on the head surface at a fixed distance from the middle, so they never fuse */
+      const w = ear.rows[0].length, d = {bunny: 2, horns: 2, cat: Math.max(2, hw[1] - 2), bear: Math.max(2, hw[1] - 2)}[pet.ears];
       for (const s of [-1, 1]){
-        const x = s < 0 ? cl - ex + 1 : cr + ex - 1, t = topAt(x);
-        if (t == null) continue;
-        const twitch = (st === "idle" && s > 0 && f % 24 < 2) || (st === "happy" && f % 2) ? -1 : 0;
-        stamp(earDef, x, t + (pet.ears === "bear" || pet.ears === "horns" ? 0 : 1) + twitch + (st === "sad" || st === "sick" ? 1 : 0), s > 0, false);
+        const twitch = (st === "idle" && s > 0 && f % 24 < 2) || ((st === "happy" || st === "play") && f % 2) ? -1 : 0;
+        const droop = st === "sad" || st === "sick" || lying ? 1 : 0;
+        const inner = 15 - d + sway, x = s < 0 ? inner - (w - 1 - ear.px) : MIR(inner - (w - 1 - ear.px)) + 2 * sway;
+        let ty = top; while (ty < bot && !body[ty][Math.max(0, Math.min(G - 1, x))]) ty++;
+        behind(cells(ear, x, ty + twitch + droop, s > 0));
       }
     }
 
-    /* the body: shading, pattern, highlight */
-    for (let y = 0; y < G; y++) for (let x = 0; x < G; x++){
-      if (!body[y][x]) continue;
-      const dx = (x + .5 - cx) / rx, dy = (y + .5 - cy) / ry;
-      let c = main;
-      if (dx + dy > 1.0) c = dark;
-      if (pet.pattern === "belly" && ((dx / .55) ** 2 + ((dy - .4) / .5) ** 2 <= 1)) c = light;
-      if (pet.pattern === "spots" && hash(x >> 1, y >> 1) > .82 && dy < .55 && dy > -.7) c = dark;
-      if (pet.pattern === "stripes" && dy < -.15 && dy > -.85 && (y - top) % 3 === 1) c = dark;
-      px[y][x] = c; solid[y][x] = true;
+    /* the body itself: shading on the lower right, pattern, highlight */
+    for (let i = 0; i < H; i++){
+      const y = top + i;
+      for (let x = L(i); x <= R(i); x++){
+        if (!inG(x, y) || !body[y][x]) continue;
+        const fx = (x - sway + .5 - 16) / hw[i];
+        let c = main;
+        if ((x === R(i) && i > H * .3) || (i === H - 1 && fx > -.2)) c = dark;
+        if (pet.pattern === "belly" && i >= H * .55 && i < H - 1 && Math.abs(fx) < .55) c = light;
+        if (pet.pattern === "spots" && i > 1 && i < H - 1 && Math.abs(fx) > .45 && hash(x - sway >> 1, i >> 1) > .7) c = dark;
+        if (pet.pattern === "stripes" && i > 1 && i < H - 2 && i % 2 === 0 && Math.abs(fx) > .7) c = dark;
+        px[y][x] = c; solid[y][x] = true;
+      }
     }
-    if (!lying){ put(cl - Math.round(Wd * .25), top + 2, "w"); put(cl - Math.round(Wd * .25) + 1, top + 2, "l"); }
+    if (!lying && hw[1] >= 3){ put(L(1) + 1, top + 1, "w"); if (hw[2] >= 4) put(L(2) + 1, top + 2, "l"); }
 
-    /* arms, in front of the body */
-    const armY = Math.round(cy + ry * 0.15), cols = colsOf(armY), strong = br === "athlete" || mus > 65;
-    if (!lying && cols.length){
-      let poseL = "down", poseR = "down", dyL = 0, dyR = 0;
-      if (st === "happy" || (st === "play" && look.toy !== "dance") || st === "eat"){ poseL = poseR = "up"; }
-      else if (st === "play"){ const a = (f % 6) < 3; poseL = a ? "up" : "down"; poseR = a ? "down" : "up"; }
-      else if (st === "hungry"){ poseR = "out"; }
-      else if (st === "idle"){ if (f % 40 > 33){ poseR = "up"; } else { dyL = (f >> 2) % 2; dyR = 1 - dyL; } }
-      const k = n => T.arm[n + (strong ? "S" : "")];
-      stamp(k(poseL), cols[0] - 1, armY + dyL, true, true);
-      stamp(k(poseR), cols[cols.length - 1] + 1, armY + dyR, false, true);
+    /* on top of the head */
+    const topT = T.top[pet.ears];
+    if (topT){
+      const rows = topT[(st === "idle" || st === "happy" || st === "play") && (f >> 2) % 2 ? 1 : 0];
+      const w = rows[0].length;
+      rows.forEach((row, j) => [...row].forEach((ch, k) => put(16 - w / 2 + k + sway, top - rows.length + j, ch, true)));
     }
-    /* things on top of the head */
-    if (T.top[pet.ears]){ const t = topAt(cl); if (t != null) stamp(T.top[pet.ears], cl, t - 1, false, true); }
 
-    /* one outline around everything solid */
+    /* one outline around everything so far */
     const edge = [];
     for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) if (!solid[y][x] && !px[y][x]){
       if ((y > 0 && solid[y - 1][x]) || (y < G - 1 && solid[y + 1][x]) || (x > 0 && solid[y][x - 1]) || (x < G - 1 && solid[y][x + 1])) edge.push([x, y]);
     }
     edge.forEach(([x, y]) => put(x, y, "o"));
 
-    /* the face, placed from the body's own size */
-    const eyeY = top + Math.max(2, Math.round(H * (baby ? 0.42 : 0.36)));
-    const gap = Math.max(1, Math.round(Wd * (baby ? 0.12 : 0.1)));
+    /* feet under the belly, arms at the shoulders */
+    if (!lying){
+      const hb = hw[H - 1], fw = baby ? 2 : 3, gap = Math.max(1, Math.round(hb * .3));
+      const walk = look.moving || st === "play";
+      for (const s of [-1, 1]){
+        const lift = (walk && ((f >> 1) % 2 === (s < 0 ? 0 : 1))) || (jump < -1) ? -1 : 0;
+        const c = [];
+        for (let k = 0; k < fw; k++) for (let j = 0; j < footH; j++){
+          const x = 15 - gap - k + sway; c.push([s < 0 ? x : MIR(x) + 2 * sway, bot + 1 + j + lift, "d"]);
+        }
+        limb(c, false);
+      }
+      const si = rowAt(H * .55), strong = br === "athlete" || mus > 65;
+      let pl = "down", pr = "down";
+      const alt = (f >> 2) % 2;
+      if (st === "happy" || st === "eat" || (st === "play" && look.toy !== "dance")){ pl = pr = "up"; }
+      else if (st === "play"){ const a = (f % 6) < 3; pl = a ? "up" : "down"; pr = a ? "down" : "up"; }
+      else if (st === "hungry"){ pl = "belly"; pr = alt ? "out" : "down"; }
+      else if (st === "idle"){ if (f % 40 > 33) pr = (f >> 1) % 2 ? "up" : "out"; else { pl = alt ? "swing" : "down"; pr = alt ? "down" : "swing"; } }
+      for (const s of [-1, 1]){
+        const pose = s < 0 ? pl : pr, x = s < 0 ? L(si) : R(si);
+        const t = T.arm[pose], short = baby && (pose === "down" || pose === "swing");
+        let c = cells(short ? {...t, rows: t.rows.slice(1)} : t, x, top + si, s > 0);
+        if (strong) c = c.concat(c.map(([a, b, ch]) => [a - s, b, ch]));
+        limb(c, true);
+      }
+    }
+
+    /* the face sits at a fixed spot on the head */
+    const ei = rowAt(baby ? 4 : 4 + Math.floor((H - 11) / 3)), eyeY = top + ei;
     const blink = (f % 30) === 0;
     let eye = T.eye[pet.eyes] ? pet.eyes : "dot";
     if (st === "sleep" || st === "hibernate" || blink) eye = "closed";
@@ -222,28 +252,38 @@
     else if (st === "sick") eye = "x";
     else if (st === "sad") eye = "sad";
     else if (br === "lazy") eye = "sleepy";
-    const er = T.eye[eye], ew = Math.max(...er.map(r => r.length));
-    er.forEach((row, j) => [...row].forEach((ch, i) => { if (ch === ".") return; put(cl - gap - ew + 1 + i, eyeY + j, ch); put(cr + gap + ew - 1 - i, eyeY + j, ch); }));
-    const eyeH = er.length;
+    const er = T.eye[eye], ew = Math.max(...er.map(r => r.length)), eyeH = er.length;
+    let g = baby ? 1 : 2;
+    while (g > 0 && 15 - g - ew + 1 + sway <= L(ei)) g--;
+    er.forEach((row, j) => [...row].forEach((ch, i) => { if (ch === ".") return; const x = 15 - g - ew + 1 + i + sway; put(x, eyeY + j, ch); put(MIR(x) + 2 * sway, eyeY + j, ch); }));
     if (!(st === "sleep" || st === "hibernate" || st === "sick" || st === "sad")){
-      const cy2 = eyeY + eyeH;
-      for (const [x, s] of [[cl - gap - ew - 1, -1], [cr + gap + ew + 1, 1]]) if (body[cy2] && body[cy2][x] && body[cy2][x - s]) { put(x, cy2, "p"); }
+      const x = 15 - g - ew + sway, y = eyeY + eyeH;
+      if (x > L(rowAt(ei + eyeH))) { put(x, y, "#F59AB0"); put(MIR(x) + 2 * sway, y, "#F59AB0"); }
     }
     let mouth = T.mouth[pet.mouth] ? pet.mouth : "smile";
     if (st === "eat") mouth = (f % 4) < 2 ? "open" : "chew";
+    else if (st === "hungry") mouth = (f >> 2) % 2 ? "open" : "frown";
     else if (st === "sad" || st === "sick" || br === "grump") mouth = "frown";
     else if (st === "sleep") mouth = "flat";
-    if (st !== "hibernate"){
-      const mr = T.mouth[mouth], mw = mr[0].length, my = eyeY + eyeH + 1;
-      mr.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== ".") put(cl + 1 - mw / 2 + i, my + j, ch); }));
+    const my = eyeY + eyeH + 1;
+    if (!lying){
+      const mr = T.mouth[mouth], mw = mr[0].length;
+      mr.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== ".") put(16 - mw / 2 + i + sway, my + j, ch); }));
+    }
+    /* a sleep bubble from the nose grows and pops */
+    if (st === "sleep"){
+      const t = (f >> 1) % 8, r = [0, 1, 1, 2, 2, 2, 0, 0][t], bx = 17 + sway + r, by = my - r;
+      if (r === 1){ put(bx, by, "#CFE8FF"); }
+      if (r >= 2) for (let a = -r + 1; a < r; a++) for (let b = -r + 1; b < r; b++) if (Math.abs(a) + Math.abs(b) <= r) put(bx + a, by + b, Math.abs(a) + Math.abs(b) === r - 1 ? "#9CC9F0" : "#DDF0FF");
+      if (r >= 2) put(bx - 1, by - 1, "w");
     }
 
     /* branch and state accessories */
     if (br === "athlete" && !lying){ const y = eyeY - 2; for (let x = 0; x < G; x++) if (body[y] && body[y][x]) put(x, y, "#E0475B"); }
-    if (br === "lazy" && st !== "happy" && !lying){ const t = topAt(cl) - 1; [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [1, -1], [2, -1], [3, -1], [2, -2], [3, -3], [4, -3]].forEach(([a, b]) => put(cl - 2 + a, t + b, b === 0 ? "#F2E8CF" : "#5B6CC2")); put(cl + 3, t - 4, "w"); }
-    if (br === "donut") [[left - 2, bot - 1], [right + 3, bot - 2], [left - 1, bot + 1]].forEach(([x, y]) => put(x, y, "#C98B4B"));
-    if (br === "balanced" && (f % 12) < 6){ put(left - 2, top + 1, "#F5C842"); put(right + 2, top + 4, "#F5C842"); put(left - 2, top, "w"); }
-    if (st === "sick"){ const my = eyeY + eyeH + 2; for (let k = 0; k < 4; k++) put(cr + k, my - (k >> 1), k === 3 ? "#E0475B" : "#DDE3EA"); }
+    if (br === "lazy" && st !== "happy" && !lying){ const t = top - 1; [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [1, -1], [2, -1], [3, -1], [4, -1], [2, -2], [3, -2], [4, -3], [5, -3]].forEach(([a, b]) => put(13 + a + sway, t + b, b === 0 ? "#F2E8CF" : "#5B6CC2")); put(18 + sway, t - 4, "w"); }
+    if (br === "donut") [[L(H - 1) - 3, bot], [R(H - 1) + 4, bot - 1], [L(H - 1) - 2, bot + 2]].forEach(([x, y]) => put(x, y, "#C98B4B"));
+    if (br === "balanced" && (f % 12) < 6){ put(L(0) - 3, top + 1, "#F5C842"); put(R(2) + 3, top + 4, "#F5C842"); put(L(0) - 3, top, "w"); }
+    if (st === "sick") for (let k = 0; k < 4; k++) put(17 + sway + k, my + 1 - (k >> 1), k === 3 ? "#E0475B" : "#DDE3EA");
     /* hibernation: tucked under a checked blanket up to the nose */
     if (lying) for (let y = eyeY + eyeH + 1; y < G; y++) for (let x = 0; x < G; x++) if (body[y][x]) px[y][x] = y === eyeY + eyeH + 1 ? "#F2E8CF" : ((x >> 1) + (y >> 1)) % 2 ? "#4F63C9" : "#7387E6";
     return px;

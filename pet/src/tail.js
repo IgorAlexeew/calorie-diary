@@ -122,6 +122,15 @@ for (const [t, st, toy] of DEMO){
   b.onclick = () => { if (!pet) return; petDemo = {state: st, toy, until: Date.now() + 6000}; setLine(localLine(petStatsNow, st)); closeMenu(); showScreen("pet"); };
   $("#pmDemo").append(b);
 }
+/* preview any age and branch; stays until "Как сейчас" */
+const AGES = [["Как сейчас", null], ["Малыш", {stage: "baby", branch: ""}], ["Юный", {stage: "young", branch: "balanced"}], ["Взрослый", {stage: "adult", branch: "balanced"}],
+  ...["athlete", "donut", "slim", "lazy", "grump"].map(b => [BRANCH_RU[b][0], {stage: "adult", branch: b, fat: b === "donut" ? 85 : b === "slim" ? 20 : 50, muscle: b === "athlete" ? 80 : 40}])];
+AGES.forEach(([t, v], i) => {
+  const b = el("button",{type:"button",text:t});
+  if (!i) b.classList.add("on");
+  b.onclick = () => { petLookDemo = v; $("#pmAge").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); closeMenu(); showScreen("pet"); };
+  $("#pmAge").append(b);
+});
 (() => {
   const b = $("#pmReroll"); let t;
   b.onclick = () => {
