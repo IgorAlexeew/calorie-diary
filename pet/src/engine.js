@@ -260,6 +260,12 @@
         if (strong) c = c.concat(c.map(([a, b, ch]) => [a - s, b, ch]));
         limb(c, true);
       }
+      /* sick: a thermometer held under the arm, sticking out up and away from the body */
+      if (st === "sick"){
+        const x0 = R(si) + 1 + (strong ? 1 : 0), y0 = top + si - 1, th = [[0, 0, "#FFFFFF"], [1, -1, "#FFFFFF"], [2, -2, "#FFFFFF"], [3, -3, "#E0475B"]];
+        th.forEach(([a, b]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([u, v]) => { const X = x0 + a + u, Y = y0 + b + v; if (inG(X, Y) && !px[Y][X]) px[Y][X] = OUT; }));
+        th.forEach(([a, b, c]) => put(x0 + a, y0 + b, c));
+      }
     }
 
     /* the face sits at a fixed spot on the head */
@@ -301,9 +307,8 @@
       const mr = T.mouth[mouth], mw = mr[0].length;
       mr.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== ".") put(16 - mw / 2 + i + sway, my + j, ch); }));
     }
-    /* sick: a thermometer in the mouth (in bed it peeks over the blanket) */
-    if (sickBed){ const y = eyeY + eyeH; for (let x = 16; x <= 18; x++) put(x + sway, y, "#FFFFFF"); put(19 + sway, y, "#E0475B"); }
-    else if (st === "sick"){ for (let x = 17; x <= 19; x++) put(x + sway, my, "#FFFFFF"); put(20 + sway, my, "#E0475B"); }
+    /* sick in bed: a cool compress on the forehead */
+    if (sickBed){ const y = eyeY - 2, w = Math.min(4, hw[rowAt(ei - 2)] - 1); for (let x = 16 - w; x < 16 + w; x++){ put(x + sway, y, "#FFFFFF"); put(x + sway, y - 1, "#CFE6F7"); } }
     /* a sleep bubble from the nose grows and pops */
     if (st === "sleep"){ const mw = (T.mouth[mouth] || T.mouth.flat)[0].length; px.bubble = [16 + mw / 2 + sway, my]; }
 
@@ -317,7 +322,6 @@
     if (br === "lazy" && st !== "happy" && !lying){ const t = top - 1; [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [1, -1], [2, -1], [3, -1], [4, -1], [2, -2], [3, -2], [4, -3], [5, -3]].forEach(([a, b]) => put(13 + a + sway, t + b, b === 0 ? "#F2E8CF" : "#5B6CC2")); put(18 + sway, t - 4, "w"); }
     if (br === "donut") [[L(H - 1) - 3, bot], [R(H - 1) + 4, bot - 1], [L(H - 1) - 2, bot + 2]].forEach(([x, y]) => put(x, y, "#C98B4B"));
     if (br === "balanced" && (f % 12) < 6){ put(L(0) - 3, top + 1, "#F5C842"); put(R(2) + 3, top + 4, "#F5C842"); put(L(0) - 3, top, "w"); }
-    if (st === "sick") for (let k = 0; k < 4; k++) put(17 + sway + k, my + 1 - (k >> 1), k === 3 ? "#E0475B" : "#DDE3EA");
     /* hibernation: tucked under a checked blanket up to the nose */
     if (lying) for (let y = eyeY + eyeH + 1; y < G; y++) for (let x = 0; x < G; x++) if (body[y][x]) px[y][x] = y === eyeY + eyeH + 1 ? "#F2E8CF" : ((x >> 1) + (y >> 1)) % 2 ? "#4F63C9" : "#7387E6";
     px.mouthY = my; px.midX = 16 + sway;
