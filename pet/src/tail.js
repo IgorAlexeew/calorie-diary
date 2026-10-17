@@ -138,7 +138,7 @@ pmRow($("#pmDemo"), DEMO, v => {
   petDemo = {state: st, toy, until: Infinity, start: Date.now(), dur: 6000, loop: true, food: st === "eat" ? pick(Object.keys(PetEngine.FOOD)) : null};
   setLine(localLine(petStatsNow, st));
 });
-pmRow($("#pmTime"), [["Как сейчас", null], ["День", "day"], ["Ночь", "night"]], v => { petTimeDemo = v; });
+pmRow($("#pmTime"), [["Как сейчас", null], ["Утро", "morning"], ["День", "day"], ["Вечер", "evening"], ["Ночь", "night"]], v => { petTimeDemo = v; });
 /* the folded HUD panels: one open at a time, remembered between visits */
 (() => {
   const pairs = [["#tglFood", "#foodPanel"], ["#tglStats", "#statsPanel"]];
@@ -228,9 +228,9 @@ $("#petCv").parentElement.onclick = () => {
       const ground = Math.max(32, Math.min(H - 2, toLog(sp.bottom), toLog(sp.top) + Math.ceil(sayH * dpr / S) + 34 - head + 2));
       const skyTop = toLog($(".topCard").getBoundingClientRect().bottom);
       /* day and night swap through a sunset, one step every few frames */
-      const want = look.night ? 1 : 0;
-      if (skyT === null) skyT = want; else if (skyT !== want) skyT = want > skyT ? Math.min(want, skyT + 1 / 24) : Math.max(want, skyT - 1 / 24);
-      PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop, sky: skyT, noThought: true});
+      const want = {morning: .5, day: 0, evening: .5, night: 1}[look.tod] ?? (look.night ? 1 : 0);
+      if (skyT === null) skyT = want; else if (skyT !== want) skyT = want > skyT ? Math.min(want, skyT + 1 / 64) : Math.max(want, skyT - 1 / 64);
+      PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop, sky: skyT, dawn: look.tod === "morning", noThought: true});
       /* a hungry pet shows what it wants inside its own speech bubble, one component with the words */
       sayFoodIcon(look.state === "hungry" ? sayFood($("#petSayText").textContent) || look.food || "apple" : null);
       /* the bubble sits right above the pet's head, its tail pointing down at it */

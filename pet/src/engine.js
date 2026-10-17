@@ -151,13 +151,14 @@
     if (st === "happy"){ jump = [0, -2, -3, -2, 0, 0][f % 6]; squash = f % 6 === 4; }
     if (st === "play" && look.toy !== "dance"){ jump = [0, -1, -2, -1, 0, 0][f % 6]; squash = f % 6 === 4; }
     if (st === "play" && look.toy === "dance") sway = [-1, -1, 0, 1, 1, 0][f % 6];
-    if (st === "sick") sway = [0, 0, 1, 1, 0, 0, -1, -1][f % 8];
+    /* a sick pet hardly moves: a small shiver now and then, and in bed nothing but slow breathing */
+    if (st === "sick" && !look.night) sway = f % 24 === 0 ? 1 : 0;
     /* reactions to being poked a lot: a ticklish pet wriggles, a grumpy one shakes, a shy one sways */
     if (st === "tickle"){ sway = [-1, 1][f % 2]; jump = [0, -1][(f >> 1) % 2]; }
     if (st === "angry") sway = [0, 1, 0, -1][f % 4];
     if (st === "shy") sway = [0, 0, -1, -1][(f >> 1) % 4];
-    if (["idle", "hungry", "sad", "sick", "shy"].includes(st)) squash = (f >> 2) % 2 === 1;
-    if (st === "sleep" || st === "hibernate") squash = (f >> 3) % 2 === 1;
+    if (["idle", "hungry", "sad", "shy"].includes(st)) squash = (f >> 2) % 2 === 1;
+    if (st === "sleep" || st === "hibernate" || st === "sick") squash = (f >> 3) % 2 === 1;
     /* sick at night: tucked under a blanket with a thermometer */
     const sickBed = st === "sick" && look.night, lying = st === "hibernate" || sickBed;
 
@@ -267,6 +268,8 @@
     else if (st === "sick") eye = "x";
     else if (st === "sad") eye = "sad";
     else if (br === "lazy") eye = "sleepy";
+    /* sleepy in the evening, early morning and when hunger keeps it up at night */
+    if (["idle", "hungry", "sad"].includes(st) && (look.tod === "evening" || look.tod === "morning" || look.tod === "night") && eye !== "closed") eye = "sleepy";
     const er = T.eye[eye], ew = Math.max(...er.map(r => r.length)), eyeH = er.length;
     let g = baby ? 1 : 2;
     while (g > 0 && 15 - g - ew + 1 + sway <= L(ei)) g--;
@@ -285,6 +288,8 @@
     else if (st === "hungry") mouth = (f >> 2) % 2 ? "open" : "frown";
     else if (st === "sad" || st === "sick" || br === "grump") mouth = "frown";
     else if (st === "sleep") mouth = "flat";
+    /* a yawn now and then when it is late or early */
+    if (st === "idle" && (look.tod === "evening" || look.tod === "morning") && f % 48 < 6) mouth = "open";
     const my = eyeY + eyeH + 1;
     if (!lying){
       const mr = T.mouth[mouth], mw = mr[0].length;
@@ -406,7 +411,9 @@
     const night0 = st === "sleep" || st === "hibernate" || opts.night;
     /* sky: 0 day, .5 sunset, 1 night; stepped in eighths, so day turns to night in a few pixel-flat steps, not a soft fade */
     const q = Math.round((opts.sky != null ? opts.sky : night0 ? 1 : 0) * 8) / 8, night = q >= .5;
-    const C = (d, k, n) => q <= .5 ? mix(d, k, q * 2) : mix(k, n, (q - .5) * 2);
+    /* the middle colour is a sunset in the evening and a paler pink-and-gold dawn in the morning */
+    const DAWN = {"#6E5A96": "#9DB4E2", "#F4A77A": "#F9D9A6", "#E08C78": "#E9C3A8", "#8FA083": "#A9BC98", "#8E5C78": "#C6A3A8", "#7C8C70": "#97AA88"};
+    const C = (d, k, n) => { if (opts.dawn) k = DAWN[k] || k; return q <= .5 ? mix(d, k, q * 2) : mix(k, n, (q - .5) * 2); };
     ctx.imageSmoothingEnabled = false;
     /* the world fills the whole canvas: sky, far hills, ground; the pet's own 48×40 stage sits on the ground in the middle */
     const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x * S, y * S, w * S, h * S); };
@@ -417,9 +424,9 @@
     R(0, skyB, W, gy - skyB, C("#D2E2CB", "#E08C78", "#222A4C"));
     R(0, gy, W, H - gy, C("#B9CDAE", "#8FA083", "#2C3358"));
     /* while the sky changes, the sun goes down behind the hills and the moon comes up */
-    if (q > 0 && q < .75){ const y = Math.round(st0 + 4 + (gy - 4 - st0 - 4) * Math.min(1, q / .6)), x = Math.floor(W * .22), c = mix("#FFE58A", "#FF8F5A", Math.min(1, q * 2));
+    if (q > 0 && q < .75){ const y = Math.round(st0 + 4 + (gy - 4 - st0 - 4) * Math.min(1, q / .6)), x = Math.floor(W * (opts.dawn ? .72 : .22)), c = opts.dawn ? "#FFE58A" : mix("#FFE58A", "#FF8F5A", Math.min(1, q * 2));
       R(x + 1, y, 3, 1, c); R(x, y + 1, 5, 3, c); R(x + 1, y + 4, 3, 1, c); }
-    if (q >= .5){
+    if (q >= .5 && !(opts.dawn && q < .75)){
       if (q >= .75){
         /* a calm night sky: constellations spread over the whole sky, a few lone stars */
         const sky = gy - 8 - st0, cells = Math.max(1, Math.round(W / 26)), rows = Math.max(1, Math.round(sky / 22)), dim = q < 1;

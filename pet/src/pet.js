@@ -93,9 +93,20 @@ function petBranch(s, stage){
   if (s.stepDays >= 3 && s.avgSteps < 3000) return "lazy";
   return "balanced";
 }
-/* asleep from bedtime (midnight if unknown) till 7:00 */
-/* night is the time of day only, whatever the pet is doing; the menu can preview day or night */
-function petNight(s){ return petTimeDemo ? petTimeDemo === "night" : isNight(s.hour); }
+/* time of day, whatever the pet is doing: night from bedtime (midnight if unknown) till 7:00, morning 7–9,
+   evening the 3 hours before bedtime; the menu can preview any of them */
+function petTod(s){
+  if (petTimeDemo) return petTimeDemo;
+  if (s.hour == null) return "day";
+  if (isNight(s.hour)) return "night";
+  const bt = /^(\d{1,2}):(\d{2})$/.exec(settings.bedtime || "");
+  let b = bt ? +bt[1] + +bt[2] / 60 : 0; if (b < 12) b += 24;
+  const h = s.hour < 7 ? s.hour + 24 : s.hour;
+  if (h >= 7 && h < 9) return "morning";
+  return h >= b - 3 ? "evening" : "day";
+}
+const TOD_RU = {morning: "утро", day: "день", evening: "вечер", night: "ночь"};
+function petNight(s){ return petTod(s) === "night"; }
 function isNight(hour){
   const bt = /^(\d{1,2}):(\d{2})$/.exec(settings.bedtime || "");
   let b = bt ? +bt[1] + +bt[2] / 60 : 0; if (b < 12) b += 24;
@@ -280,7 +291,7 @@ async function requestLine(reason, force){
   const s = petStatsNow, st = petState(s), stage = petStage(petAge()), br = petBranch(s, stage);
   const why = {poke: `хозяин тыкает в тебя уже ${petPokes} раз подряд, а ты ${TOUCH[petTouch()].ru}`, eat:"хозяин только что записал еду", tap:"хозяин тебя погладил", state:"твоё состояние изменилось", open:"хозяин открыл приложение", hatch:"ты только что вылупился", wake:"ты спишь, а хозяин тыкает в тебя и будит: ответь сонно, сквозь сон, со звуком храпа"}[reason] || "просто так";
   const prompt = `Ты — ${pet.name}, 8-битный питомец в дневнике питания хозяина. Характер: ${pet.trait || "добрый и любопытный"}. Стадия: ${STAGE_RU[stage]}${br ? ", ветка развития «" + BRANCH_RU[br][0] + "»" : ""}.
-Сейчас ${new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}. Ты ${STATE_RU[st] || "спокоен"}.
+Сейчас ${new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}, ${TOD_RU[petTod(s)]}. Ты ${STATE_RU[st] || "спокоен"}.
 Как ты себя чувствуешь: здоровье ${s.health > 60 ? "хорошее" : s.health > 30 ? "так себе" : "плохое"}, настроение ${s.mood > 60 ? "хорошее" : s.mood > 30 ? "среднее" : "плохое"}, сытость ${s.food > 60 ? "сыт" : s.food > 30 ? "немного голоден" : "голоден"}.
 Что ты знаешь про день: ${petFacts(s)}. Дней подряд с записями: ${s.streak}.
 Повод для реплики: ${why}.${st === "sleep" || st === "hibernate" || (st === "sick" && petNight(s)) ? "\nТы сейчас спишь, поэтому реплика — бормотание во сне: сонные обрывки слов про еду или сны, многоточия, храп или сопение в скобках, например «(хр-р) Ням… куфное ябвотько…». Не обращайся к хозяину и ни о чём не проси." : ""}
@@ -418,7 +429,7 @@ function petLook(){
     return {pet: {palette: hatching ? hatching.palette : "mint"}, look: {stage: "egg", crack, state: "idle"}};
   }
   const st = petStatsNow ? petState(s) : "idle", stage = petStage(petAge());
-  const look = {state: st, fat: s.fat, muscle: s.muscle, branch: petBranch(s, stage), stage, toy: petToy(), night: s.hour != null && petNight(s)};
+  const look = {state: st, fat: s.fat, muscle: s.muscle, branch: petBranch(s, stage), stage, toy: petToy(), tod: petTod(s), night: petTod(s) === "night"};
   const now = Date.now(), ev = petDemo && petDemo.until > now ? petDemo : petEvt && petEvt.until > now ? petEvt : null;
   /* a menu preview eats in a loop; a real meal once */
   if (ev && ev.food){ look.food = ev.food; look.eatT = ev.loop ? ((now - ev.start) % ev.dur) / ev.dur : 1 - (ev.until - now) / (ev.dur || 4500); }
