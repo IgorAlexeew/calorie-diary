@@ -66,8 +66,8 @@ h3{font-size:16px;margin:6px 0 0}
 .petScreen > .world,.petScreen > .hud{position:absolute;inset:0;max-width:none;width:auto;margin:0}
 .world{overflow:hidden;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .world canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges}
-.hud{overflow:hidden;display:flex;flex-direction:column;gap:12px;pointer-events:none;
-  padding:calc(14px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(96px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.hud{overflow:hidden;display:flex;flex-direction:column;gap:8px;pointer-events:none;
+  padding:calc(12px + env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) calc(68px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
 .hud > *{width:100%;max-width:520px;margin-inline:auto;flex-shrink:0;pointer-events:auto}
 .hud > .petSpace{flex:1 0 230px;pointer-events:none}
 /* HUD panels: one neutral see-through dark glass in every theme, so they sit on day and night alike */
@@ -147,6 +147,8 @@ select{background-image:none;border:2px solid var(--line);padding-right:12px}
 .chatSheet{position:fixed;left:0;right:0;bottom:0;z-index:21;max-width:560px;margin:0 auto;background:var(--surface);border-top:3px solid var(--line);
   padding:8px max(12px,env(safe-area-inset-left,0px)) calc(8px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column}
 @media (min-width:560px){.chatSheet{border:3px solid var(--line);border-bottom:0}}
+/* folded, the chat is just a bar on the same column and edges as the HUD */
+.chatSheet[data-open="false"]{max-width:544px;background:none;border:0;padding:0 max(12px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
 .chatBar{display:flex;gap:10px;align-items:center}
 .chatOpen{flex:1;min-width:0;display:flex;align-items:center;gap:10px;height:44px;padding:0 10px;border:3px solid var(--line);background:var(--bg);color:var(--fg);text-align:left}
 .chatPrev{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px;color:var(--muted)}
