@@ -21,9 +21,11 @@
   --chev:none; color-scheme:dark}
 
 *,*::before,*::after{border-radius:0!important}
+/* the whole interface reads larger: every text is scaled by its x-height, whatever px size the diary styles give it */
+*{font-size-adjust:.7!important}
 html,body{height:100%}
-body{padding:0;margin:0;overflow:hidden;background:var(--bg);color:var(--fg);font:500 15px/1.45 var(--body);font-size-adjust:.56}
-button,input,select,textarea{font-family:var(--body);font-size-adjust:.56}
+body{padding:0;margin:0;overflow:hidden;background:var(--bg);color:var(--fg);font:500 15px/1.45 var(--body);font-size-adjust:.64}
+button,input,select,textarea{font-family:var(--body);font-size-adjust:.64}
 b,strong,.entrytext,.actTitle,.recipeTitle{font-weight:700}
 .px{border:3px solid var(--line);box-shadow:var(--shadow);background:var(--surface)}
 svg.pxi{display:block;flex-shrink:0;shape-rendering:crispEdges}
@@ -42,7 +44,7 @@ h3{font-size:16px;margin:6px 0 0}
 .screen > *{width:100%;max-width:520px;margin-inline:auto;flex-shrink:0}
 
 /* buttons */
-.pxBtn{display:inline-grid;place-items:center;width:40px;height:40px;padding:0;border:3px solid var(--line);background:var(--surface);color:var(--fg);box-shadow:var(--shadow);flex-shrink:0}
+.pxBtn{display:inline-grid;place-items:center;width:46px;height:46px;padding:0;border:3px solid var(--line);background:var(--surface);color:var(--fg);box-shadow:var(--shadow);flex-shrink:0}
 .pxBtn:active,.small:active,.chip:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--line)}
 .pxBtn.rec{background:var(--over);color:#fff;animation:recBlink .8s steps(2) infinite}
 @keyframes recBlink{50%{background:var(--surface);color:var(--over)}}
@@ -143,4 +145,6 @@ select{background-image:none;border:2px solid var(--line);padding-right:12px}
 .pmInfo dd{margin:0}
 .pmDemo{display:flex;flex-wrap:wrap;gap:8px}
 .pmDemo button{font:600 16px var(--display);border:2px solid var(--line);background:var(--surface);color:var(--fg);box-shadow:2px 2px 0 var(--line);padding:6px 10px}
-svg text{font-size-adjust:none}
+svg text{font-size-adjust:.5!important}
+
+.chipWait{font-size:14px}
