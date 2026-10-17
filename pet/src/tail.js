@@ -195,6 +195,19 @@ $("#petCv").parentElement.onclick = () => {
     }
     return headVal;
   }
+  /* which food the line is about: the pet's own words first, then the food names */
+  function sayFood(t){
+    const s = String(t || "").toLowerCase();
+    if (/мясик|мяс/.test(s)) return "meat"; if (/яйк|яйц/.test(s)) return "egg"; if (/сятк|сладк|слатк/.test(s)) return "cake";
+    if (/ягодк|ягод/.test(s)) return "berry"; if (/фьукт|флукт|фрукт|ябвок|ябл/.test(s)) return "apple";
+    const n = PetEngine.foodFor(s); return n === "bowl" && !/кас|каш/.test(s) ? null : n;
+  }
+  let sayIcoKey = "";
+  function sayFoodIcon(name){
+    const c = $("#petSayIco"); if ((name || "") === sayIcoKey) return;
+    sayIcoKey = name || ""; c.hidden = !name; if (!name) return;
+    const x = c.getContext("2d"); x.clearRect(0, 0, 40, 40); PetEngine.drawFood(x, name, 1, 1, 4, 0);
+  }
   function tick(){
     const {pet: p, look} = petLook();
     /* size the world to the screen; the ground lies just under the free space between the HUD panels */
@@ -211,7 +224,9 @@ $("#petCv").parentElement.onclick = () => {
       /* day and night swap through a sunset, one step every few frames */
       const want = look.state === "sleep" || look.state === "hibernate" ? 1 : 0;
       if (skyT === null) skyT = want; else if (skyT !== want) skyT = want > skyT ? Math.min(want, skyT + 1 / 24) : Math.max(want, skyT - 1 / 24);
-      PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop, sky: skyT});
+      PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop, sky: skyT, noThought: true});
+      /* a hungry pet shows what it wants inside its own speech bubble, one component with the words */
+      sayFoodIcon(look.state === "hungry" ? sayFood($("#petSayText").textContent) || look.food || "apple" : null);
       /* the bubble sits right above the pet's head, its tail pointing down at it */
       const hr = $("#hud").getBoundingClientRect(), headY = wr.top + (ground - 30 + head) * S / dpr - hr.top;
       const cx = wr.left + (Math.floor((W - 48) / 2) + 24) * S / dpr - hr.left;

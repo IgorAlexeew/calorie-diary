@@ -486,7 +486,7 @@
     if (st === "angry"){ const ax = 30, ay = 12 - (f >> 1) % 2; [[0,0],[2,0],[1,1],[0,2],[2,2]].forEach(([a, b]) => { ctx.fillStyle = "#E0475B"; ctx.fillRect((ax + a) * S, (ay + b) * S, S, S); }); if (f % 4 < 2){ ctx.fillStyle = "rgba(255,255,255,.8)"; ctx.fillRect(13 * S, 10 * S, 2 * S, S); ctx.fillRect(33 * S, 9 * S, 2 * S, S); } }
     if (st === "tickle") for (let k = 0; k < 2; k++){ const t = (f + k * 5) % 10; ctx.fillStyle = "#F5C842"; ctx.fillRect((k ? 34 : 12) * S, (16 - t) * S, S, S); ctx.fillRect((k ? 35 : 11) * S, (17 - t) * S, S, S); }
     if (st === "sad") icon(ctx, "drop", (34 + (f % 2)) * S, 14 * S, "#6AB3F0", S * .7 | 0 || 1);
-    if (st === "hungry"){ ctx.fillStyle = "#FFFFFF"; ctx.fillRect(33 * S, 3 * S, 12 * S, 12 * S); ctx.fillRect(31 * S, 14 * S, 2 * S, 2 * S); drawFood(ctx, look.food || "apple", 35, 5, S, 0); }
+    if (st === "hungry" && !opts.noThought){ ctx.fillStyle = "#FFFFFF"; ctx.fillRect(33 * S, 3 * S, 12 * S, 12 * S); ctx.fillRect(31 * S, 14 * S, 2 * S, 2 * S); drawFood(ctx, look.food || "apple", 35, 5, S, 0); }
     if (st === "play" && look.toy !== "dance"){ icon(ctx, "ball", bx * S, byy * S, "#E0475B", S); ctx.fillStyle = "#FFFFFF"; ctx.fillRect((bx + 1) * S, (byy + 1) * S, S, S); }
     if (st === "play" && look.toy === "dance") for (let k = 0; k < 2; k++){ const t = (f + k * 9) % 18; icon(ctx, "note", (k ? 36 : 6) * S, (18 - (t >> 1)) * S, k ? "#8A63D2" : "#3E8FD8", S * .7 | 0 || 1); }
     ctx.restore();
