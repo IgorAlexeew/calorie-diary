@@ -1,0 +1,162 @@
+/* ---------- pixel versions of the diary's widgets ---------- */
+/* the day's calories: 20 segments, overflow turns the last ones red */
+function drawRing(ratio){
+  const n = 20, filled = Math.min(n, Math.round(Math.max(0, ratio) * n)), over = ratio > 1 ? Math.min(n, Math.max(1, Math.round((ratio - 1) * n))) : 0;
+  const box = $("#kcalSeg"); box.style.setProperty("--c", ratio > 1 ? "var(--warn)" : "var(--ok)");
+  segs(box, n, filled, over);
+}
+
+/* ---------- screens ---------- */
+function showScreen(name){
+  const sc = $("#screens"); sc.dataset.screen = name;
+  $("#petScreen").inert = name !== "pet"; $("#diaryScreen").inert = name !== "diary";
+  if (name === "pet" && cur !== todayKey()){ cur = todayKey(); render(); renderChat(); }
+  (name === "pet" ? $("#petScreen") : $("#diaryScreen")).scrollTop = 0;
+}
+$("#toDiary").innerHTML = pxIcon("book", 20);
+$("#toPet").innerHTML = pxIcon("back", 18);
+$("#petMenuBtn").innerHTML = pxIcon("menu", 18);
+$("#prev").innerHTML = pxIcon("chevL", 14);
+$("#next").innerHTML = pxIcon("chevR", 14);
+$("#toDiary").onclick = () => showScreen("diary");
+$("#toPet").onclick = () => showScreen("pet");
+
+/* ---------- chat sheet ---------- */
+$("#chatIco").innerHTML = pxIcon("chat", 18);
+$("#attachIco").innerHTML = ICON_CLIP;
+$("#chatClose").innerHTML = pxIcon("down", 16);
+$("#barMic").innerHTML = pxIcon("mic", 20);
+$("#micBtn").innerHTML = pxIcon("mic", 16);
+function openChat(open){
+  const sh = $("#chatSheet"); sh.dataset.open = String(open);
+  $("#sheetShade").hidden = !open;
+  $("#chatOpen").setAttribute("aria-expanded", String(open));
+  if (open){ const f = $("#feed"); f.scrollTop = f.scrollHeight; }
+}
+$("#chatOpen").onclick = () => openChat(true);
+$("#chatClose").onclick = () => openChat(false);
+$("#sheetShade").onclick = () => openChat(false);
+document.addEventListener("keydown", e => { if (e.key === "Escape"){ openChat(false); closeMenu(); } });
+function chatBarPreview(){
+  const p = $("#chatPrev"); if (!p) return;
+  const msgs = chatMsgs(cur), lastM = msgs[msgs.length - 1];
+  p.classList.toggle("busy", chatBusy);
+  if (chatBusy) p.textContent = "Думаю…";
+  else if (lastM) p.textContent = lastM.role === "user" ? (lastM.text || "Фото") : (lastM.text || "Готово");
+  else p.textContent = "Напиши или скажи, что съел";
+}
+
+/* ---------- voice messages ----------
+   In the Android app native.js provides window.__transcribe(blob) → text (Gemini via odirouter).
+   In a browser, the built-in speech recognition is used where it exists. */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let voice = null; /* {kind, rec|mr, chunks, text} */
+function setMic(on){ for (const b of [$("#barMic"), $("#micBtn")]){ b.classList.toggle("rec", on); b.setAttribute("aria-label", on ? "Остановить запись" : "Голосовое сообщение"); } }
+function voiceErr(t){ setStatus(t, true); openChat(true); }
+async function startVoice(){
+  if (chatBusy) return;
+  if (voice){ stopVoice(); return; }
+  openChat(true);
+  if (window.__transcribe && navigator.mediaDevices && window.MediaRecorder){
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({audio: true}); }
+    catch (e) { voiceErr("Нет доступа к микрофону. Разреши его в настройках."); return; }
+    const mr = new MediaRecorder(stream), chunks = [];
+    voice = {kind: "rec", mr, chunks};
+    mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    mr.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop()); voice = null; setMic(false);
+      const blob = new Blob(chunks, {type: mr.mimeType || "audio/webm"});
+      if (blob.size < 2000){ setStatus("Слишком короткая запись.", true); return; }
+      setStatus("Распознаю голос…");
+      try { const t = str(await window.__transcribe(blob), 2000); setStatus(""); if (t) sendChat(t, true); else setStatus("Не расслышал. Попробуй ещё раз.", true); }
+      catch (e) { setStatus("Не получилось распознать голос.", true); }
+    };
+    mr.start(); setMic(true); setStatus("Говори. Нажми на микрофон ещё раз, чтобы отправить.");
+    return;
+  }
+  if (!SR){ voiceErr("Голосовой ввод в этом окне недоступен. В приложении на телефоне он будет работать через Gemini."); return; }
+  const rec = new SR(), ta = $("#foodText"), before = ta.value;
+  rec.lang = "ru-RU"; rec.interimResults = true; rec.continuous = true;
+  voice = {kind: "sr", rec, text: "", failed: false};
+  rec.onresult = e => {
+    let t = ""; for (const r of e.results) t += r[0].transcript;
+    voice.text = t; ta.value = (before ? before + " " : "") + t; autoGrow();
+  };
+  rec.onerror = e => {
+    if (!voice) return; voice.failed = true;
+    voiceErr(e.error === "not-allowed" || e.error === "service-not-allowed" ? "Здесь браузер не даёт доступа к микрофону. В приложении на телефоне голос будет работать через Gemini, а пока напиши текстом." : e.error === "no-speech" ? "Не расслышал. Попробуй ещё раз." : "Голосовой ввод сейчас не сработал.");
+  };
+  rec.onend = () => {
+    const v = voice; voice = null; setMic(false);
+    if (!v || v.failed) return;
+    setStatus("");
+    const t = ta.value.trim();
+    if (v.text.trim() && t) sendChat(t, true);
+  };
+  try { rec.start(); setMic(true); setStatus("Говори. Нажми на микрофон ещё раз, чтобы отправить."); }
+  catch (e) { voice = null; voiceErr("Голосовой ввод сейчас не сработал."); }
+}
+function stopVoice(){ if (!voice) return; if (voice.kind === "rec") voice.mr.stop(); else voice.rec.stop(); }
+$("#barMic").onclick = startVoice;
+$("#micBtn").onclick = startVoice;
+
+/* ---------- pet menu ---------- */
+function closeMenu(){ $("#petMenu").hidden = true; }
+$("#pmClose").innerHTML = pxIcon("close", 14);
+$("#pmClose").onclick = closeMenu;
+$("#petMenu").addEventListener("click", e => { if (e.target === e.currentTarget) closeMenu(); });
+$("#petMenuBtn").onclick = () => {
+  const info = $("#pmInfo"); info.replaceChildren();
+  const s = petStatsNow || petStats(), age = petAge(), stage = petStage(age), br = petBranch(s, stage);
+  const rows = pet ? [["Имя", pet.name], ["Характер", pet.trait || "—"], ["Стадия", `${STAGE_RU[stage]}, дней с записями: ${age}`],
+    ["Ветка", br ? `${BRANCH_RU[br][0]}: ${BRANCH_RU[br][1]}` : "появится с 7 дней"], ["Опыт", `${petXp()}, уровень ${petLevel(petXp())}`],
+    ["Поколение", String(pet.gen || 1)]] : [["Яйцо", "вылупится после первой записи еды"]];
+  const dl = el("dl",{class:"pmInfo"}); for (const [a, b] of rows) dl.append(el("dt",{text:a}), el("dd",{text:b}));
+  info.append(dl);
+  $("#petMenu").hidden = false;
+};
+const DEMO = [["Ест","eat"],["Играет с мячом","play","ball"],["Танцует","play","dance"],["Радуется","happy"],["Грустит","sad"],["Голоден","hungry"],["Болеет","sick"],["Спит","sleep"],["Спячка","hibernate"]];
+for (const [t, st, toy] of DEMO){
+  const b = el("button",{type:"button",text:t});
+  b.onclick = () => { if (!pet) return; petDemo = {state: st, toy, until: Date.now() + 6000}; setLine(localLine(petStatsNow, st)); closeMenu(); showScreen("pet"); };
+  $("#pmDemo").append(b);
+}
+(() => {
+  const b = $("#pmReroll"); let t;
+  b.onclick = () => {
+    if (!db) return;
+    if (!b.classList.contains("arm")){ b.classList.add("arm"); b.textContent = "Точно? Нажми ещё раз"; t = setTimeout(() => { b.classList.remove("arm"); b.textContent = "Переродить зверька"; }, 4000); return; }
+    clearTimeout(t); b.classList.remove("arm"); b.textContent = "Переродить зверька";
+    closeMenu(); lineKey = ""; hatchPet();
+  };
+})();
+
+/* ---------- tapping the pet ---------- */
+$("#petCv").parentElement.onclick = () => {
+  if (!pet){ if (!hatching){ petEvt = {state: "idle", until: Date.now() + 800}; setLine(localLine(petStatsNow || {}, "idle")); } return; }
+  const st = petStatsNow ? petState(petStatsNow) : "idle";
+  if (st === "sleep" || st === "hibernate"){ setLine(st === "sleep" ? "Хр-р… Не буди, я сплю." : "Хр-р… Запиши еду, и я проснусь."); return; }
+  petEvent("happy", 1600);
+  requestLine("tap", Date.now() - lineAt > 15000);
+};
+
+/* ---------- the animation loop: 6 frames a second, like old consoles ---------- */
+(() => {
+  const ctx = $("#petCv").getContext("2d");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let f = 0, lastTag = "";
+  try { const l = JSON.parse(localStorage.getItem("petLine") || "null"); if (l && l.d === todayKey() && l.t) setLine(l.t); } catch (e) {}
+  function tick(){
+    const {pet: p, look} = petLook();
+    PetEngine.draw(ctx, p, look, f, {scale: 4});
+    const tag = look.stage === "egg" ? "" : (look.toy === "dance" && look.state === "play" ? "Танцует" : STATE_TAG[look.state] || "");
+    if (tag !== lastTag){ const t = $("#sceneTag"); t.hidden = !tag; t.textContent = tag; lastTag = tag; }
+    f++;
+  }
+  tick();
+  setInterval(() => { if (!reduce || f % 6 === 0) tick(); else f++; }, 160);
+  /* time moves on: hunger, night, hibernation */
+  setInterval(() => { if (typeof days !== "undefined") petOnRender(); }, 60000);
+})();
+chatBarPreview();
