@@ -158,7 +158,8 @@
     if (st === "shy") sway = [0, 0, -1, -1][(f >> 1) % 4];
     if (["idle", "hungry", "sad", "sick", "shy"].includes(st)) squash = (f >> 2) % 2 === 1;
     if (st === "sleep" || st === "hibernate") squash = (f >> 3) % 2 === 1;
-    const lying = st === "hibernate";
+    /* sick at night: tucked under a blanket with a thermometer */
+    const sickBed = st === "sick" && look.night, lying = st === "hibernate" || sickBed;
 
     /* the body */
     const hw = grow(pet.body, stage, fat, br, squash), H = hw.length;
@@ -259,7 +260,7 @@
     const ei = rowAt(baby ? 4 : 4 + Math.floor((H - 11) / 3)), eyeY = top + ei;
     const blink = (f % 30) === 0;
     let eye = T.eye[pet.eyes] ? pet.eyes : "dot";
-    if (st === "sleep" || st === "hibernate" || st === "shy" || blink) eye = "closed";
+    if (st === "sleep" || st === "hibernate" || sickBed || st === "shy" || blink) eye = "closed";
     else if (st === "tickle") eye = "joy";
     else if (st === "angry") eye = "angry";
     else if (st === "happy" || st === "play" || (st === "eat" && (f % 4) > 1)) eye = "joy";
@@ -289,6 +290,7 @@
       const mr = T.mouth[mouth], mw = mr[0].length;
       mr.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== ".") put(16 - mw / 2 + i + sway, my + j, ch); }));
     }
+    if (sickBed){ const y = eyeY + eyeH; for (let x = 16; x <= 18; x++) put(x + sway, y, "#FFFFFF"); put(19 + sway, y, "#E0475B"); }
     /* a sleep bubble from the nose grows and pops */
     if (st === "sleep"){ const mw = (T.mouth[mouth] || T.mouth.flat)[0].length; px.bubble = [16 + mw / 2 + sway, my]; }
 
@@ -474,7 +476,7 @@
         if (r >= 2){ ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.fillRect((bx - 1) * S, (by - r + 1) * S, S, S); }
       }
     }
-    if (st === "sleep" || st === "hibernate") for (let k = 0; k < 2; k++){ const t = (f + k * 8) % 16; icon(ctx, "z", (33 + k * 4 + (t >> 3)) * S, (14 - (t >> 1)) * S, "#F4F1D0", S * (k ? 1 : 0.75) | 0 || 1); }
+    if (st === "sleep" || st === "hibernate" || (st === "sick" && look.night)) for (let k = 0; k < 2; k++){ const t = (f + k * 8) % 16; icon(ctx, "z", (33 + k * 4 + (t >> 3)) * S, (14 - (t >> 1)) * S, "#F4F1D0", S * (k ? 1 : 0.75) | 0 || 1); }
     const eatT = look.eatT == null ? (f % 24) / 24 : look.eatT;
     if (st === "happy" || (st === "eat" && eatT > .85)) for (let k = 0; k < 3; k++){ const t = (f * 2 + k * 7) % 20; icon(ctx, "heart", (10 + k * 13) * S, (16 - t / 2) * S | 0, "#E0475B", S * .6 | 0 || 1); }
     if (st === "eat" && eatT <= .85 && grid.mouthY != null){

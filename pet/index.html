@@ -456,6 +456,7 @@ svg text{font-size-adjust:.5!important}
 .say .fx{color:#8A8C93}
 .pmInfo dd.pmWords{color:var(--muted)}
 .sayIco{width:26px;height:26px;image-rendering:pixelated;flex-shrink:0;margin-right:8px}
+.modalBox h4{margin:10px 0 6px;font-family:var(--display);font-size:16px;font-weight:400;color:var(--muted)}
 </style>
 <div class="app" id="app">
   <div class="screens" id="screens" data-screen="pet">
@@ -614,10 +615,14 @@ svg text{font-size-adjust:.5!important}
     <div class="modalBox px">
       <div class="modalHead"><h2 id="pmTitle">Питомец</h2><button type="button" class="pxBtn" id="pmClose" aria-label="Закрыть"></button></div>
       <div class="pmInfo" id="pmInfo"></div>
-      <h3>Посмотреть состояния</h3>
+      <h3>Просмотр</h3>
+      <p class="hint">Состояние, возраст и время суток сочетаются как угодно. «Как сейчас» возвращает настоящее.</p>
+      <h4>Состояние</h4>
       <div class="pmDemo" id="pmDemo"></div>
-      <h3>Посмотреть возраст и ветку</h3>
+      <h4>Возраст и ветка</h4>
       <div class="pmDemo" id="pmAge"></div>
+      <h4>Время суток</h4>
+      <div class="pmDemo" id="pmTime"></div>
       <h3>Переродить</h3>
       <p class="hint">Зверёк вернётся в яйцо, и ИИ соберёт нового. Записи дневника останутся.</p>
       <button type="button" class="small danger" id="pmReroll">Переродить зверька</button>
@@ -818,7 +823,8 @@ function pxEl(name, size, cls){ const s = document.createElement("span"); s.styl
     if (st === "shy") sway = [0, 0, -1, -1][(f >> 1) % 4];
     if (["idle", "hungry", "sad", "sick", "shy"].includes(st)) squash = (f >> 2) % 2 === 1;
     if (st === "sleep" || st === "hibernate") squash = (f >> 3) % 2 === 1;
-    const lying = st === "hibernate";
+    /* sick at night: tucked under a blanket with a thermometer */
+    const sickBed = st === "sick" && look.night, lying = st === "hibernate" || sickBed;
 
     /* the body */
     const hw = grow(pet.body, stage, fat, br, squash), H = hw.length;
@@ -919,7 +925,7 @@ function pxEl(name, size, cls){ const s = document.createElement("span"); s.styl
     const ei = rowAt(baby ? 4 : 4 + Math.floor((H - 11) / 3)), eyeY = top + ei;
     const blink = (f % 30) === 0;
     let eye = T.eye[pet.eyes] ? pet.eyes : "dot";
-    if (st === "sleep" || st === "hibernate" || st === "shy" || blink) eye = "closed";
+    if (st === "sleep" || st === "hibernate" || sickBed || st === "shy" || blink) eye = "closed";
     else if (st === "tickle") eye = "joy";
     else if (st === "angry") eye = "angry";
     else if (st === "happy" || st === "play" || (st === "eat" && (f % 4) > 1)) eye = "joy";
@@ -949,6 +955,7 @@ function pxEl(name, size, cls){ const s = document.createElement("span"); s.styl
       const mr = T.mouth[mouth], mw = mr[0].length;
       mr.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== ".") put(16 - mw / 2 + i + sway, my + j, ch); }));
     }
+    if (sickBed){ const y = eyeY + eyeH; for (let x = 16; x <= 18; x++) put(x + sway, y, "#FFFFFF"); put(19 + sway, y, "#E0475B"); }
     /* a sleep bubble from the nose grows and pops */
     if (st === "sleep"){ const mw = (T.mouth[mouth] || T.mouth.flat)[0].length; px.bubble = [16 + mw / 2 + sway, my]; }
 
@@ -1134,7 +1141,7 @@ function pxEl(name, size, cls){ const s = document.createElement("span"); s.styl
         if (r >= 2){ ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.fillRect((bx - 1) * S, (by - r + 1) * S, S, S); }
       }
     }
-    if (st === "sleep" || st === "hibernate") for (let k = 0; k < 2; k++){ const t = (f + k * 8) % 16; icon(ctx, "z", (33 + k * 4 + (t >> 3)) * S, (14 - (t >> 1)) * S, "#F4F1D0", S * (k ? 1 : 0.75) | 0 || 1); }
+    if (st === "sleep" || st === "hibernate" || (st === "sick" && look.night)) for (let k = 0; k < 2; k++){ const t = (f + k * 8) % 16; icon(ctx, "z", (33 + k * 4 + (t >> 3)) * S, (14 - (t >> 1)) * S, "#F4F1D0", S * (k ? 1 : 0.75) | 0 || 1); }
     const eatT = look.eatT == null ? (f % 24) / 24 : look.eatT;
     if (st === "happy" || (st === "eat" && eatT > .85)) for (let k = 0; k < 3; k++){ const t = (f * 2 + k * 7) % 20; icon(ctx, "heart", (10 + k * 13) * S, (16 - t / 2) * S | 0, "#E0475B", S * .6 | 0 || 1); }
     if (st === "eat" && eatT <= .85 && grid.mouthY != null){
@@ -1157,7 +1164,7 @@ function pxEl(name, size, cls){ const s = document.createElement("span"); s.styl
 
 /* ---------- the pet: stats from the diary, its state, AI lines, hatching ---------- */
 let pet = null, petLoaded = false, hatching = null;
-let petDemo = null, petEvt = null, petStatsNow = null, petLookDemo = null, petPokes = 0;
+let petDemo = null, petEvt = null, petStatsNow = null, petLookDemo = null, petTimeDemo = null, petPokes = 0;
 const STAT_DEFS = [
   {k:"health", label:"Здоровье",   icon:"heart",    c:"var(--s-health)"},
   {k:"shape",  label:"Форма",      icon:"scale",    c:"var(--s-shape)"},
@@ -1251,6 +1258,8 @@ function petBranch(s, stage){
   return "balanced";
 }
 /* asleep from bedtime (midnight if unknown) till 7:00 */
+/* night is the time of day only, whatever the pet is doing; the menu can preview day or night */
+function petNight(s){ return petTimeDemo ? petTimeDemo === "night" : isNight(s.hour); }
 function isNight(hour){
   const bt = /^(\d{1,2}):(\d{2})$/.exec(settings.bedtime || "");
   let b = bt ? +bt[1] + +bt[2] / 60 : 0; if (b < 12) b += 24;
@@ -1263,9 +1272,10 @@ function petState(s, base){
   if (!base && petDemo && petDemo.until > now) return petDemo.state;
   if (!base && petEvt && petEvt.until > now) return petEvt.state;
   if (s.idleDays != null && s.idleDays >= 3 && !isLogged(s.today)) return "hibernate";
-  if (isNight(s.hour)) return "sleep";
+  /* being sick or hungry keeps the pet awake at night; sick at night is drawn tucked in bed */
   if (s.health < 30) return "sick";
   if (s.food < 25) return "hungry";
+  if (petNight(s)) return "sleep";
   if (s.tr > 1.1) return "sad";
   if (s.mood >= 65 && s.health >= 55) return "play";
   return "idle";
@@ -1288,7 +1298,7 @@ function setLine(t, loading){
   const box = $("#petSayText"); box.textContent = "";
   String(t).split(/(\([^)]*\))/).filter(Boolean).forEach(x => box.append(x[0] === "(" ? el("span",{class:"fx", text: x}) : document.createTextNode(x)));
   $("#petSay").classList.toggle("loading", !!loading);
-  if (!loading) try { localStorage.setItem("petLine", JSON.stringify({t, d: todayKey(), at: Date.now()})); } catch (e) {}
+  if (!loading) try { localStorage.setItem("petLine", JSON.stringify({t, d: todayKey(), at: Date.now(), st: pet && petStatsNow ? petState(petStatsNow, true) : ""})); } catch (e) {}
 }
 /* how the pet takes being poked again and again: set at hatching, so the AI knows how to react */
 const TOUCH = {
@@ -1367,12 +1377,13 @@ function localLine(s, st){
   if (!pet) return hatching ? slow(["(крак-крак) Уа! Моя тут-ку!", "(хрусь) Мо… узе скоро-фа!", "(крак) Пливет-мо?"])
     : slow(["(тук-тук) Ням-ням дась? Вы-упка-мо!", "(тук… тук) Ням дай — моя вы-ес-ку.", "(хрусь) Ням зду моя, мо-мо…"]);
   const stage = petStage(petAge()), baby = stage === "baby";
+  if (st === "sick" && s.hour != null && petNight(s)) st = "sickbed";
   const L = {
-    baby: {hibernate: "(хр-р) Долга пью… Ням дай — пласнусь.", sleep: "(хр-р) Бай-бай… не буди-и.", eat: "(хрум-хрум) Ням! Куфна-а. Пасиба, мо!", hungry: "(урчит живот) Уа… кусать хосю!", sad: "Уф… пузико бо-бо. Многа ням.",
+    baby: {sickbed: "(кхе-кхе) Бо-бо… бай-бай…", hibernate: "(хр-р) Ням… ням… пласнусь-мо…", sleep: "(хр-р) Ням… куфное ябвотько…", eat: "(хрум-хрум) Ням! Куфна-а. Пасиба, мо!", hungry: "(урчит живот) Уа… кусать хосю!", sad: "Уф… пузико бо-бо. Многа ням.",
       sick: "Хнык… моя бо-бо…", play: "Иии! Мятик! Игать-ку!", idle: s.left > 0 ? "Ням есё мозна? Мо?" : "Хватит ням. Фа-фа."},
-    young: {hibernate: "(хр-р) Ням запиши, я проснусь.", sleep: "(хр-р) До завтра, пур.", eat: "(хрум-хрум) Вкусно, спасибо!", hungry: "(урчит живот) Ням где? Голодный я, ку.", sad: "Пузико тяжёлое… многовато ням.",
+    young: {sickbed: "(кхе) Болею… сплю… ням потом…", hibernate: "(хр-р) Ням… проснусь… потом…", sleep: "(хр-р) Вкусное яблочко… мур…", eat: "(хрум-хрум) Вкусно, спасибо!", hungry: "(урчит живот) Ням где? Голодный я, ку.", sad: "Пузико тяжёлое… многовато ням.",
       sick: "Плохо мне, бо-бо. Полегче ешь?", play: "Играю! Хоросо сегодня, мур!", idle: s.left > 0 ? "Ещё поесть можно, ням." : "Хватит еды сегодня, пур."},
-    adult: {hibernate: "(хр-р) Запиши еду, и я проснусь.", sleep: "(хр-р) До завтра.", eat: "(хрум-хрум) Спасибо, вкусно!", hungry: "(урчит живот) Пур… Где моя еда?", sad: "Фыр, тяжело в животе. Хватит на сегодня.",
+    adult: {sickbed: "(кхе-кхе) Полежу… под одеялком…", hibernate: "(хр-р) Запиши еду… и я проснусь…", sleep: "(хр-р) Ммм… тёплый суп… пур…", eat: "(хрум-хрум) Спасибо, вкусно!", hungry: "(урчит живот) Пур… Где моя еда?", sad: "Фыр, тяжело в животе. Хватит на сегодня.",
       sick: "Мур… Мне нехорошо. Давай полегче?", play: "Играю! Мне сегодня хорошо.", idle: s.left > 0 ? "Пур… Ещё можно перекусить." : "Мур. На сегодня хватит еды."}
   }[stage] || {};
   const R = baby ? {tickle: "Иии! Сикотна! Хи-хи-ку!", angry: "Фыл! Не тыкай! Бзз!", shy: "Ой… агу… стисняюсь…", happy: "Мул-мул… есё, есё!"}
@@ -1385,9 +1396,9 @@ function localLine(s, st){
 /* ready-made lines for instant moments (taps, pokes, sleep, demo) are written by the AI too, in the pet's own voice,
    so they don't sound too correct next to the live ones; the fixed lines above are only a fallback */
 const PACK_STATES = {idle:"спокоен, всё нормально", hungry:"голоден", eat:"ест вкусное", sad:"переел, живот тяжёлый", sick:"плохо себя чувствует, хозяин ест не по норме", play:"играет, ему хорошо",
-  sleep:"спит, хозяин тыкает и будит", hibernate:"впал в спячку, хозяин давно не записывал еду", tickle:"хозяин часто тыкает, а ему щекотно", angry:"хозяин часто тыкает, а он злится", shy:"хозяин часто тыкает, а он смущается", happy:"хозяин гладит, ему приятно"};
+  sickbed:"болеет и ночью лежит в кровати под одеялом с градусником, сонно бормочет и покашливает, кашель в скобках", sleep:"спит и бормочет во сне: сонные обрывки слов про еду или сны, многоточия, храп в скобках, к хозяину не обращается", hibernate:"в глубокой спячке, хозяин давно не записывал еду: бормочет сквозь сон, что проснётся от ням, храп в скобках", tickle:"хозяин часто тыкает, а ему щекотно", angry:"хозяин часто тыкает, а он злится", shy:"хозяин часто тыкает, а он смущается", happy:"хозяин гладит, ему приятно"};
 let linePack = null, packBusy = false;
-try { linePack = JSON.parse(localStorage.getItem("petLinePack3") || "null"); } catch (e) {}
+try { linePack = JSON.parse(localStorage.getItem("petLinePack5") || "null"); } catch (e) {}
 async function refreshLinePack(){
   if (!pet || !sample || packBusy) return;
   const stage = petStage(petAge());
@@ -1410,7 +1421,7 @@ ${Object.entries(PACK_STATES).map(([k, v]) => `- ${k}: ${v}`).join("\n")}
     if (Object.keys(lines).length >= 6){
       learnWords(r.words);
       linePack = {stage, name: pet.name, d: todayKey(), lines};
-      try { localStorage.setItem("petLinePack3", JSON.stringify(linePack)); } catch (e) {}
+      try { localStorage.setItem("petLinePack5", JSON.stringify(linePack)); } catch (e) {}
     }
   } catch (e) {} finally { packBusy = false; }
 }
@@ -1436,7 +1447,7 @@ async function requestLine(reason, force){
 Сейчас ${new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}. Ты ${STATE_RU[st] || "спокоен"}.
 Как ты себя чувствуешь: здоровье ${s.health > 60 ? "хорошее" : s.health > 30 ? "так себе" : "плохое"}, настроение ${s.mood > 60 ? "хорошее" : s.mood > 30 ? "среднее" : "плохое"}, сытость ${s.food > 60 ? "сыт" : s.food > 30 ? "немного голоден" : "голоден"}.
 Что ты знаешь про день: ${petFacts(s)}. Дней подряд с записями: ${s.streak}.
-Повод для реплики: ${why}.
+Повод для реплики: ${why}.${st === "sleep" || st === "hibernate" || (st === "sick" && petNight(s)) ? "\nТы сейчас спишь, поэтому реплика — бормотание во сне: сонные обрывки слов про еду или сны, многоточия, храп или сопение в скобках, например «(хр-р) Ням… куфное ябвотько…». Не обращайся к хозяину и ни о чём не проси." : ""}
 Как ты говоришь: ${speechRule(stage)}
 Напиши одну реплику питомца хозяину, по-русски, не длиннее ${SPEECH[stage].max} символов. Живо, с характером, по-доброму, по поводу и по тому, что важно сейчас (голоден, переел, мало сытной еды, вкусно). Никогда не говори взрослых слов про диету: норма, калории, ккал, белок, БЖУ, порция, и без цифр. Без эмодзи, кавычек и хэштегов. Если в реплике ты придумал или исковеркал новое словечко, которого нет в словарике, верни его в words с тем, что оно значит.
 Ответь только JSON: {"line":"реплика","words":[{"w":"словечко","m":"что значит, 1–3 слова"}]} (words можно пустым).`;
@@ -1557,8 +1568,8 @@ function petOnRender(){
   if (pet && key !== lineKey){
     const first = !lineKey; lineKey = key;
     let saved = null; try { saved = JSON.parse(localStorage.getItem("petLine") || "null"); } catch (e) {}
-    const fresh = saved && saved.at && Date.now() - saved.at < 45 * 60000;
-    if (first ? !fresh : Date.now() - lineAt > 5 * 60000) requestLine(first ? "open" : "state", true);
+    const fresh = saved && saved.at && saved.st === key && Date.now() - saved.at < 45 * 60000;
+    if (first ? !fresh : Date.now() - lineAt > 5 * 60000){ if (sample) requestLine(first ? "open" : "state", true); else setLine(localLine(s, key)); }
     else if (!first && !(petEvt && petEvt.until > Date.now())) setLine(localLine(s, key));
   }
   if (!pet) setLine(localLine(s, st));
@@ -1571,9 +1582,10 @@ function petLook(){
     return {pet: {palette: hatching ? hatching.palette : "mint"}, look: {stage: "egg", crack, state: "idle"}};
   }
   const st = petStatsNow ? petState(s) : "idle", stage = petStage(petAge());
-  const look = {state: st, fat: s.fat, muscle: s.muscle, branch: petBranch(s, stage), stage, toy: petToy()};
+  const look = {state: st, fat: s.fat, muscle: s.muscle, branch: petBranch(s, stage), stage, toy: petToy(), night: s.hour != null && petNight(s)};
   const now = Date.now(), ev = petDemo && petDemo.until > now ? petDemo : petEvt && petEvt.until > now ? petEvt : null;
-  if (ev && ev.food){ look.food = ev.food; look.eatT = 1 - (ev.until - now) / (ev.dur || 4500); }
+  /* a menu preview eats in a loop; a real meal once */
+  if (ev && ev.food){ look.food = ev.food; look.eatT = ev.loop ? ((now - ev.start) % ev.dur) / ev.dur : 1 - (ev.until - now) / (ev.dur || 4500); }
   if (petLookDemo) Object.assign(look, petLookDemo);
   return {pet, look};
 }
@@ -2903,12 +2915,23 @@ $("#petMenuBtn").onclick = () => {
   info.append(dl);
   $("#petMenu").hidden = false;
 };
-const DEMO = [["Хохочет","tickle"],["Злится","angry"],["Смущается","shy"],["Ест","eat"],["Играет с мячом","play","ball"],["Танцует","play","dance"],["Радуется","happy"],["Грустит","sad"],["Голоден","hungry"],["Болеет","sick"],["Спит","sleep"],["Спячка","hibernate"]];
-for (const [t, st, toy] of DEMO){
-  const b = el("button",{type:"button",text:t});
-  b.onclick = () => { if (!pet) return; petDemo = {state: st, toy, until: Date.now() + 6000, dur: 6000, food: st === "eat" ? pick(Object.keys(PetEngine.FOOD)) : null}; setLine(localLine(petStatsNow, st)); closeMenu(); showScreen("pet"); };
-  $("#pmDemo").append(b);
+/* preview: state, age and time of day combine freely and stay until "Как сейчас" in that row */
+function pmRow(box, items, apply){
+  items.forEach(([t, v], i) => {
+    const b = el("button",{type:"button",text:t});
+    if (!i) b.classList.add("on");
+    b.onclick = () => { if (!pet) return; apply(v); box.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); closeMenu(); showScreen("pet"); };
+    box.append(b);
+  });
 }
+const DEMO = [["Как сейчас",null],["Хохочет",["tickle"]],["Злится",["angry"]],["Смущается",["shy"]],["Ест",["eat"]],["Играет с мячом",["play","ball"]],["Танцует",["play","dance"]],["Радуется",["happy"]],["Грустит",["sad"]],["Голоден",["hungry"]],["Болеет",["sick"]],["Спит",["sleep"]],["Спячка",["hibernate"]]];
+pmRow($("#pmDemo"), DEMO, v => {
+  if (!v){ petDemo = null; lineKey = ""; petOnRender(); return; }
+  const [st, toy] = v;
+  petDemo = {state: st, toy, until: Infinity, start: Date.now(), dur: 6000, loop: true, food: st === "eat" ? pick(Object.keys(PetEngine.FOOD)) : null};
+  setLine(localLine(petStatsNow, st));
+});
+pmRow($("#pmTime"), [["Как сейчас", null], ["День", "day"], ["Ночь", "night"]], v => { petTimeDemo = v; });
 /* the folded HUD panels: one open at a time, remembered between visits */
 (() => {
   const pairs = [["#tglFood", "#foodPanel"], ["#tglStats", "#statsPanel"]];
@@ -2923,12 +2946,7 @@ for (const [t, st, toy] of DEMO){
 /* preview any age and branch; stays until "Как сейчас" */
 const AGES = [["Как сейчас", null], ["Малыш", {stage: "baby", branch: ""}], ["Юный", {stage: "young", branch: "balanced"}], ["Взрослый", {stage: "adult", branch: "balanced"}],
   ...["athlete", "donut", "slim", "lazy", "grump"].map(b => [BRANCH_RU[b][0], {stage: "adult", branch: b, fat: b === "donut" ? 85 : b === "slim" ? 20 : 50, muscle: b === "athlete" ? 80 : 40}])];
-AGES.forEach(([t, v], i) => {
-  const b = el("button",{type:"button",text:t});
-  if (!i) b.classList.add("on");
-  b.onclick = () => { petLookDemo = v; $("#pmAge").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); closeMenu(); showScreen("pet"); };
-  $("#pmAge").append(b);
-});
+pmRow($("#pmAge"), AGES, v => { petLookDemo = v; });
 (() => {
   const b = $("#pmReroll"); let t;
   b.onclick = () => {
@@ -3003,7 +3021,7 @@ $("#petCv").parentElement.onclick = () => {
       const ground = Math.max(32, Math.min(H - 2, toLog(sp.bottom), toLog(sp.top) + Math.ceil(sayH * dpr / S) + 34 - head + 2));
       const skyTop = toLog($(".topCard").getBoundingClientRect().bottom);
       /* day and night swap through a sunset, one step every few frames */
-      const want = look.state === "sleep" || look.state === "hibernate" ? 1 : 0;
+      const want = look.night ? 1 : 0;
       if (skyT === null) skyT = want; else if (skyT !== want) skyT = want > skyT ? Math.min(want, skyT + 1 / 24) : Math.max(want, skyT - 1 / 24);
       PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop, sky: skyT, noThought: true});
       /* a hungry pet shows what it wants inside its own speech bubble, one component with the words */

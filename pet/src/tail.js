@@ -122,12 +122,23 @@ $("#petMenuBtn").onclick = () => {
   info.append(dl);
   $("#petMenu").hidden = false;
 };
-const DEMO = [["Хохочет","tickle"],["Злится","angry"],["Смущается","shy"],["Ест","eat"],["Играет с мячом","play","ball"],["Танцует","play","dance"],["Радуется","happy"],["Грустит","sad"],["Голоден","hungry"],["Болеет","sick"],["Спит","sleep"],["Спячка","hibernate"]];
-for (const [t, st, toy] of DEMO){
-  const b = el("button",{type:"button",text:t});
-  b.onclick = () => { if (!pet) return; petDemo = {state: st, toy, until: Date.now() + 6000, dur: 6000, food: st === "eat" ? pick(Object.keys(PetEngine.FOOD)) : null}; setLine(localLine(petStatsNow, st)); closeMenu(); showScreen("pet"); };
-  $("#pmDemo").append(b);
+/* preview: state, age and time of day combine freely and stay until "Как сейчас" in that row */
+function pmRow(box, items, apply){
+  items.forEach(([t, v], i) => {
+    const b = el("button",{type:"button",text:t});
+    if (!i) b.classList.add("on");
+    b.onclick = () => { if (!pet) return; apply(v); box.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); closeMenu(); showScreen("pet"); };
+    box.append(b);
+  });
 }
+const DEMO = [["Как сейчас",null],["Хохочет",["tickle"]],["Злится",["angry"]],["Смущается",["shy"]],["Ест",["eat"]],["Играет с мячом",["play","ball"]],["Танцует",["play","dance"]],["Радуется",["happy"]],["Грустит",["sad"]],["Голоден",["hungry"]],["Болеет",["sick"]],["Спит",["sleep"]],["Спячка",["hibernate"]]];
+pmRow($("#pmDemo"), DEMO, v => {
+  if (!v){ petDemo = null; lineKey = ""; petOnRender(); return; }
+  const [st, toy] = v;
+  petDemo = {state: st, toy, until: Infinity, start: Date.now(), dur: 6000, loop: true, food: st === "eat" ? pick(Object.keys(PetEngine.FOOD)) : null};
+  setLine(localLine(petStatsNow, st));
+});
+pmRow($("#pmTime"), [["Как сейчас", null], ["День", "day"], ["Ночь", "night"]], v => { petTimeDemo = v; });
 /* the folded HUD panels: one open at a time, remembered between visits */
 (() => {
   const pairs = [["#tglFood", "#foodPanel"], ["#tglStats", "#statsPanel"]];
@@ -142,12 +153,7 @@ for (const [t, st, toy] of DEMO){
 /* preview any age and branch; stays until "Как сейчас" */
 const AGES = [["Как сейчас", null], ["Малыш", {stage: "baby", branch: ""}], ["Юный", {stage: "young", branch: "balanced"}], ["Взрослый", {stage: "adult", branch: "balanced"}],
   ...["athlete", "donut", "slim", "lazy", "grump"].map(b => [BRANCH_RU[b][0], {stage: "adult", branch: b, fat: b === "donut" ? 85 : b === "slim" ? 20 : 50, muscle: b === "athlete" ? 80 : 40}])];
-AGES.forEach(([t, v], i) => {
-  const b = el("button",{type:"button",text:t});
-  if (!i) b.classList.add("on");
-  b.onclick = () => { petLookDemo = v; $("#pmAge").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); closeMenu(); showScreen("pet"); };
-  $("#pmAge").append(b);
-});
+pmRow($("#pmAge"), AGES, v => { petLookDemo = v; });
 (() => {
   const b = $("#pmReroll"); let t;
   b.onclick = () => {
@@ -222,7 +228,7 @@ $("#petCv").parentElement.onclick = () => {
       const ground = Math.max(32, Math.min(H - 2, toLog(sp.bottom), toLog(sp.top) + Math.ceil(sayH * dpr / S) + 34 - head + 2));
       const skyTop = toLog($(".topCard").getBoundingClientRect().bottom);
       /* day and night swap through a sunset, one step every few frames */
-      const want = look.state === "sleep" || look.state === "hibernate" ? 1 : 0;
+      const want = look.night ? 1 : 0;
       if (skyT === null) skyT = want; else if (skyT !== want) skyT = want > skyT ? Math.min(want, skyT + 1 / 24) : Math.max(want, skyT - 1 / 24);
       PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop, sky: skyT, noThought: true});
       /* a hungry pet shows what it wants inside its own speech bubble, one component with the words */

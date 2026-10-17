@@ -209,3 +209,4 @@ svg text{font-size-adjust:.5!important}
 .say .fx{color:#8A8C93}
 .pmInfo dd.pmWords{color:var(--muted)}
 .sayIco{width:26px;height:26px;image-rendering:pixelated;flex-shrink:0;margin-right:8px}
+.modalBox h4{margin:10px 0 6px;font-family:var(--display);font-size:16px;font-weight:400;color:var(--muted)}

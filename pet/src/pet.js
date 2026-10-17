@@ -1,6 +1,6 @@
 /* ---------- the pet: stats from the diary, its state, AI lines, hatching ---------- */
 let pet = null, petLoaded = false, hatching = null;
-let petDemo = null, petEvt = null, petStatsNow = null, petLookDemo = null, petPokes = 0;
+let petDemo = null, petEvt = null, petStatsNow = null, petLookDemo = null, petTimeDemo = null, petPokes = 0;
 const STAT_DEFS = [
   {k:"health", label:"Здоровье",   icon:"heart",    c:"var(--s-health)"},
   {k:"shape",  label:"Форма",      icon:"scale",    c:"var(--s-shape)"},
@@ -94,6 +94,8 @@ function petBranch(s, stage){
   return "balanced";
 }
 /* asleep from bedtime (midnight if unknown) till 7:00 */
+/* night is the time of day only, whatever the pet is doing; the menu can preview day or night */
+function petNight(s){ return petTimeDemo ? petTimeDemo === "night" : isNight(s.hour); }
 function isNight(hour){
   const bt = /^(\d{1,2}):(\d{2})$/.exec(settings.bedtime || "");
   let b = bt ? +bt[1] + +bt[2] / 60 : 0; if (b < 12) b += 24;
@@ -106,9 +108,10 @@ function petState(s, base){
   if (!base && petDemo && petDemo.until > now) return petDemo.state;
   if (!base && petEvt && petEvt.until > now) return petEvt.state;
   if (s.idleDays != null && s.idleDays >= 3 && !isLogged(s.today)) return "hibernate";
-  if (isNight(s.hour)) return "sleep";
+  /* being sick or hungry keeps the pet awake at night; sick at night is drawn tucked in bed */
   if (s.health < 30) return "sick";
   if (s.food < 25) return "hungry";
+  if (petNight(s)) return "sleep";
   if (s.tr > 1.1) return "sad";
   if (s.mood >= 65 && s.health >= 55) return "play";
   return "idle";
@@ -131,7 +134,7 @@ function setLine(t, loading){
   const box = $("#petSayText"); box.textContent = "";
   String(t).split(/(\([^)]*\))/).filter(Boolean).forEach(x => box.append(x[0] === "(" ? el("span",{class:"fx", text: x}) : document.createTextNode(x)));
   $("#petSay").classList.toggle("loading", !!loading);
-  if (!loading) try { localStorage.setItem("petLine", JSON.stringify({t, d: todayKey(), at: Date.now()})); } catch (e) {}
+  if (!loading) try { localStorage.setItem("petLine", JSON.stringify({t, d: todayKey(), at: Date.now(), st: pet && petStatsNow ? petState(petStatsNow, true) : ""})); } catch (e) {}
 }
 /* how the pet takes being poked again and again: set at hatching, so the AI knows how to react */
 const TOUCH = {
@@ -210,12 +213,13 @@ function localLine(s, st){
   if (!pet) return hatching ? slow(["(крак-крак) Уа! Моя тут-ку!", "(хрусь) Мо… узе скоро-фа!", "(крак) Пливет-мо?"])
     : slow(["(тук-тук) Ням-ням дась? Вы-упка-мо!", "(тук… тук) Ням дай — моя вы-ес-ку.", "(хрусь) Ням зду моя, мо-мо…"]);
   const stage = petStage(petAge()), baby = stage === "baby";
+  if (st === "sick" && s.hour != null && petNight(s)) st = "sickbed";
   const L = {
-    baby: {hibernate: "(хр-р) Долга пью… Ням дай — пласнусь.", sleep: "(хр-р) Бай-бай… не буди-и.", eat: "(хрум-хрум) Ням! Куфна-а. Пасиба, мо!", hungry: "(урчит живот) Уа… кусать хосю!", sad: "Уф… пузико бо-бо. Многа ням.",
+    baby: {sickbed: "(кхе-кхе) Бо-бо… бай-бай…", hibernate: "(хр-р) Ням… ням… пласнусь-мо…", sleep: "(хр-р) Ням… куфное ябвотько…", eat: "(хрум-хрум) Ням! Куфна-а. Пасиба, мо!", hungry: "(урчит живот) Уа… кусать хосю!", sad: "Уф… пузико бо-бо. Многа ням.",
       sick: "Хнык… моя бо-бо…", play: "Иии! Мятик! Игать-ку!", idle: s.left > 0 ? "Ням есё мозна? Мо?" : "Хватит ням. Фа-фа."},
-    young: {hibernate: "(хр-р) Ням запиши, я проснусь.", sleep: "(хр-р) До завтра, пур.", eat: "(хрум-хрум) Вкусно, спасибо!", hungry: "(урчит живот) Ням где? Голодный я, ку.", sad: "Пузико тяжёлое… многовато ням.",
+    young: {sickbed: "(кхе) Болею… сплю… ням потом…", hibernate: "(хр-р) Ням… проснусь… потом…", sleep: "(хр-р) Вкусное яблочко… мур…", eat: "(хрум-хрум) Вкусно, спасибо!", hungry: "(урчит живот) Ням где? Голодный я, ку.", sad: "Пузико тяжёлое… многовато ням.",
       sick: "Плохо мне, бо-бо. Полегче ешь?", play: "Играю! Хоросо сегодня, мур!", idle: s.left > 0 ? "Ещё поесть можно, ням." : "Хватит еды сегодня, пур."},
-    adult: {hibernate: "(хр-р) Запиши еду, и я проснусь.", sleep: "(хр-р) До завтра.", eat: "(хрум-хрум) Спасибо, вкусно!", hungry: "(урчит живот) Пур… Где моя еда?", sad: "Фыр, тяжело в животе. Хватит на сегодня.",
+    adult: {sickbed: "(кхе-кхе) Полежу… под одеялком…", hibernate: "(хр-р) Запиши еду… и я проснусь…", sleep: "(хр-р) Ммм… тёплый суп… пур…", eat: "(хрум-хрум) Спасибо, вкусно!", hungry: "(урчит живот) Пур… Где моя еда?", sad: "Фыр, тяжело в животе. Хватит на сегодня.",
       sick: "Мур… Мне нехорошо. Давай полегче?", play: "Играю! Мне сегодня хорошо.", idle: s.left > 0 ? "Пур… Ещё можно перекусить." : "Мур. На сегодня хватит еды."}
   }[stage] || {};
   const R = baby ? {tickle: "Иии! Сикотна! Хи-хи-ку!", angry: "Фыл! Не тыкай! Бзз!", shy: "Ой… агу… стисняюсь…", happy: "Мул-мул… есё, есё!"}
@@ -228,9 +232,9 @@ function localLine(s, st){
 /* ready-made lines for instant moments (taps, pokes, sleep, demo) are written by the AI too, in the pet's own voice,
    so they don't sound too correct next to the live ones; the fixed lines above are only a fallback */
 const PACK_STATES = {idle:"спокоен, всё нормально", hungry:"голоден", eat:"ест вкусное", sad:"переел, живот тяжёлый", sick:"плохо себя чувствует, хозяин ест не по норме", play:"играет, ему хорошо",
-  sleep:"спит, хозяин тыкает и будит", hibernate:"впал в спячку, хозяин давно не записывал еду", tickle:"хозяин часто тыкает, а ему щекотно", angry:"хозяин часто тыкает, а он злится", shy:"хозяин часто тыкает, а он смущается", happy:"хозяин гладит, ему приятно"};
+  sickbed:"болеет и ночью лежит в кровати под одеялом с градусником, сонно бормочет и покашливает, кашель в скобках", sleep:"спит и бормочет во сне: сонные обрывки слов про еду или сны, многоточия, храп в скобках, к хозяину не обращается", hibernate:"в глубокой спячке, хозяин давно не записывал еду: бормочет сквозь сон, что проснётся от ням, храп в скобках", tickle:"хозяин часто тыкает, а ему щекотно", angry:"хозяин часто тыкает, а он злится", shy:"хозяин часто тыкает, а он смущается", happy:"хозяин гладит, ему приятно"};
 let linePack = null, packBusy = false;
-try { linePack = JSON.parse(localStorage.getItem("petLinePack3") || "null"); } catch (e) {}
+try { linePack = JSON.parse(localStorage.getItem("petLinePack5") || "null"); } catch (e) {}
 async function refreshLinePack(){
   if (!pet || !sample || packBusy) return;
   const stage = petStage(petAge());
@@ -253,7 +257,7 @@ ${Object.entries(PACK_STATES).map(([k, v]) => `- ${k}: ${v}`).join("\n")}
     if (Object.keys(lines).length >= 6){
       learnWords(r.words);
       linePack = {stage, name: pet.name, d: todayKey(), lines};
-      try { localStorage.setItem("petLinePack3", JSON.stringify(linePack)); } catch (e) {}
+      try { localStorage.setItem("petLinePack5", JSON.stringify(linePack)); } catch (e) {}
     }
   } catch (e) {} finally { packBusy = false; }
 }
@@ -279,7 +283,7 @@ async function requestLine(reason, force){
 Сейчас ${new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}. Ты ${STATE_RU[st] || "спокоен"}.
 Как ты себя чувствуешь: здоровье ${s.health > 60 ? "хорошее" : s.health > 30 ? "так себе" : "плохое"}, настроение ${s.mood > 60 ? "хорошее" : s.mood > 30 ? "среднее" : "плохое"}, сытость ${s.food > 60 ? "сыт" : s.food > 30 ? "немного голоден" : "голоден"}.
 Что ты знаешь про день: ${petFacts(s)}. Дней подряд с записями: ${s.streak}.
-Повод для реплики: ${why}.
+Повод для реплики: ${why}.${st === "sleep" || st === "hibernate" || (st === "sick" && petNight(s)) ? "\nТы сейчас спишь, поэтому реплика — бормотание во сне: сонные обрывки слов про еду или сны, многоточия, храп или сопение в скобках, например «(хр-р) Ням… куфное ябвотько…». Не обращайся к хозяину и ни о чём не проси." : ""}
 Как ты говоришь: ${speechRule(stage)}
 Напиши одну реплику питомца хозяину, по-русски, не длиннее ${SPEECH[stage].max} символов. Живо, с характером, по-доброму, по поводу и по тому, что важно сейчас (голоден, переел, мало сытной еды, вкусно). Никогда не говори взрослых слов про диету: норма, калории, ккал, белок, БЖУ, порция, и без цифр. Без эмодзи, кавычек и хэштегов. Если в реплике ты придумал или исковеркал новое словечко, которого нет в словарике, верни его в words с тем, что оно значит.
 Ответь только JSON: {"line":"реплика","words":[{"w":"словечко","m":"что значит, 1–3 слова"}]} (words можно пустым).`;
@@ -400,8 +404,8 @@ function petOnRender(){
   if (pet && key !== lineKey){
     const first = !lineKey; lineKey = key;
     let saved = null; try { saved = JSON.parse(localStorage.getItem("petLine") || "null"); } catch (e) {}
-    const fresh = saved && saved.at && Date.now() - saved.at < 45 * 60000;
-    if (first ? !fresh : Date.now() - lineAt > 5 * 60000) requestLine(first ? "open" : "state", true);
+    const fresh = saved && saved.at && saved.st === key && Date.now() - saved.at < 45 * 60000;
+    if (first ? !fresh : Date.now() - lineAt > 5 * 60000){ if (sample) requestLine(first ? "open" : "state", true); else setLine(localLine(s, key)); }
     else if (!first && !(petEvt && petEvt.until > Date.now())) setLine(localLine(s, key));
   }
   if (!pet) setLine(localLine(s, st));
@@ -414,9 +418,10 @@ function petLook(){
     return {pet: {palette: hatching ? hatching.palette : "mint"}, look: {stage: "egg", crack, state: "idle"}};
   }
   const st = petStatsNow ? petState(s) : "idle", stage = petStage(petAge());
-  const look = {state: st, fat: s.fat, muscle: s.muscle, branch: petBranch(s, stage), stage, toy: petToy()};
+  const look = {state: st, fat: s.fat, muscle: s.muscle, branch: petBranch(s, stage), stage, toy: petToy(), night: s.hour != null && petNight(s)};
   const now = Date.now(), ev = petDemo && petDemo.until > now ? petDemo : petEvt && petEvt.until > now ? petEvt : null;
-  if (ev && ev.food){ look.food = ev.food; look.eatT = 1 - (ev.until - now) / (ev.dur || 4500); }
+  /* a menu preview eats in a loop; a real meal once */
+  if (ev && ev.food){ look.food = ev.food; look.eatT = ev.loop ? ((now - ev.start) % ev.dur) / ev.dur : 1 - (ev.until - now) / (ev.dur || 4500); }
   if (petLookDemo) Object.assign(look, petLookDemo);
   return {pet, look};
 }
