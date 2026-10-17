@@ -17,6 +17,7 @@ import android.provider.Settings;
 import android.view.View;
 import android.view.Window;
 import android.webkit.JavascriptInterface;
+import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -45,7 +46,7 @@ public class MainActivity extends Activity {
     static final String HOST = "diary.app.local";
     static final String DEFAULT_BASE = "https://api.odirouter.ai/v1";
     static final String ACTION_ADD = "app.caloriediary.ADD";
-    static final int REQ_FILES = 1, REQ_EXPORT = 2, REQ_NOTIFY = 3;
+    static final int REQ_FILES = 1, REQ_EXPORT = 2, REQ_NOTIFY = 3, REQ_MIC = 4;
     /* model and API address always come from the build (secrets.properties or env); the key too, unless the build has none */
     static final boolean BUILT_IN = !BuildConfig.API_KEY.isEmpty();
 
@@ -55,6 +56,7 @@ public class MainActivity extends Activity {
     Uri cameraUri;
     String pendingExport;
     String launchAction;
+    PermissionRequest micRequest;
     final Map<String, HttpURLConnection> running = new HashMap<String, HttpURLConnection>();
 
     @Override
@@ -83,8 +85,9 @@ public class MainActivity extends Activity {
                 if (path == null || path.equals("/")) path = "/index.html";
                 try {
                     InputStream in = getAssets().open(path.substring(1));
-                    String mime = path.endsWith(".js") ? "text/javascript" : path.endsWith(".css") ? "text/css" : "text/html";
-                    return new WebResourceResponse(mime, "utf-8", in);
+                    String mime = path.endsWith(".js") ? "text/javascript" : path.endsWith(".css") ? "text/css"
+                        : path.endsWith(".woff2") ? "font/woff2" : path.endsWith(".png") ? "image/png" : "text/html";
+                    return new WebResourceResponse(mime, mime.startsWith("text") ? "utf-8" : null, in);
                 } catch (Exception e) {
                     return new WebResourceResponse("text/plain", "utf-8", 404, "Not found", null, null);
                 }
@@ -102,6 +105,14 @@ public class MainActivity extends Activity {
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> cb, FileChooserParams params) {
                 return openChooser(cb, params);
+            }
+
+            /* microphone for voice messages: the page asks through getUserMedia, Android asks the user once */
+            @Override
+            public void onPermissionRequest(final PermissionRequest req) {
+                runOnUiThread(new Runnable() {
+                    public void run() { grantMic(req); }
+                });
             }
         });
         setContentView(web);
@@ -135,9 +146,27 @@ public class MainActivity extends Activity {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIFY);
     }
 
+    void grantMic(PermissionRequest req) {
+        boolean audio = false;
+        for (String r : req.getResources()) if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(r)) audio = true;
+        if (!audio) { req.deny(); return; }
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            req.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+            return;
+        }
+        if (micRequest != null) micRequest.deny();
+        micRequest = req;
+        requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_MIC);
+    }
+
     @Override
     public void onRequestPermissionsResult(int req, String[] perms, int[] res) {
         if (req == REQ_NOTIFY) js("window.__native && __native.notifyChanged()");
+        if (req == REQ_MIC && micRequest != null) {
+            if (res.length > 0 && res[0] == PackageManager.PERMISSION_GRANTED) micRequest.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+            else micRequest.deny();
+            micRequest = null;
+        }
     }
 
     @Override
@@ -153,7 +182,7 @@ public class MainActivity extends Activity {
     void paintBars() {
         Window w = getWindow();
         boolean night = isNight();
-        int bg = night ? Color.parseColor("#111318") : Color.parseColor("#F3F4F7");
+        int bg = BuildConfig.PET ? Color.parseColor(night ? "#1E1F22" : "#E9E9EB") : Color.parseColor(night ? "#111318" : "#F3F4F7");
         w.setStatusBarColor(bg);
         w.setNavigationBarColor(bg);
         View d = w.getDecorView();
@@ -366,6 +395,7 @@ public class MainActivity extends Activity {
                 JSONObject o = new JSONObject();
                 o.put("base", base());
                 o.put("model", model());
+                o.put("audioModel", BuildConfig.AUDIO_MODEL);
                 o.put("hasKey", !key().isEmpty());
                 o.put("builtIn", BUILT_IN);
                 o.put("reminders", Reminders.load(MainActivity.this));

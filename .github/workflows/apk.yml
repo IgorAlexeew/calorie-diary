@@ -1,10 +1,15 @@
 name: APK
 
-# main    -> release "v<version>.<run>",          calorie-diary-<version>.<run>.apk
-# develop -> pre-release "dev-<version>.<run>",   dev-calorie-diary-<version>.<run>.apk
-# Both use the same package and key, so a dev build installs over a release build and back.
+# Every run builds both faces from the same code: classic (calorie-diary) and pixel (pixel-diary).
+# main    -> release "v<version>.<run>",          calorie-diary-<version>.<run>.apk + pixel-diary-<version>.<run>.apk
+# develop -> pre-release "dev-<version>.<run>",   the same files with a dev- prefix
+# Dev and release builds share package and key, so a dev build installs over a release build and back;
+# classic and pixel have different packages and sit on the phone side by side.
 on:
   push:
+    branches: [main, develop]
+  # a PR into develop or main builds both APKs as run artifacts to try before merging, no release
+  pull_request:
     branches: [main, develop]
   workflow_dispatch:
 
@@ -14,8 +19,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # secrets come from the environment named after the branch (develop, main), then from repository secrets
-    environment: ${{ github.ref_name }}
+    # secrets come from the environment named after the branch (develop, main; for a PR its target), then from repository secrets
+    environment: ${{ github.base_ref || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v5
@@ -33,7 +38,8 @@ jobs:
           {
             echo "VERSION_CODE=$((100 + ${{ github.run_number }}))"
             echo "VERSION_NAME=$PREFIX$VERSION"
-            echo "APK_NAME=${PREFIX}calorie-diary-$VERSION.apk"
+            echo "APK_CLASSIC=${PREFIX}calorie-diary-$VERSION.apk"
+            echo "APK_PET=${PREFIX}pixel-diary-$VERSION.apk"
             echo "TAG=$TAG"
             echo "PRERELEASE=$([ -n "$PREFIX" ] && echo --prerelease || true)"
           } >> "$GITHUB_ENV"
@@ -52,19 +58,26 @@ jobs:
           ODIROUTER_API_KEY: ${{ secrets.ODIROUTER_API_KEY }}
           ODIROUTER_MODEL: ${{ vars.ODIROUTER_MODEL }}
           ODIROUTER_BASE: ${{ vars.ODIROUTER_BASE }}
+          ODIROUTER_AUDIO_MODEL: ${{ vars.ODIROUTER_AUDIO_MODEL }}
           SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
         run: |
           if [ -z "$ODIROUTER_API_KEY" ]; then echo "::warning::ODIROUTER_API_KEY is not set, the key will have to be entered in the app"; fi
-          gradle assembleRelease --no-daemon --stacktrace
-          APK=$(ls build/outputs/apk/release/*.apk | head -1)
-          mkdir -p dist && cp "$APK" "dist/$APK_NAME"
+          gradle assembleClassicRelease assemblePetRelease --no-daemon --stacktrace
+          mkdir -p dist
+          cp "$(ls build/outputs/apk/classic/release/*.apk | head -1)" "dist/$APK_CLASSIC"
+          cp "$(ls build/outputs/apk/pet/release/*.apk | head -1)" "dist/$APK_PET"
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.APK_NAME }}
-          path: dist/${{ env.APK_NAME }}
+          name: ${{ env.APK_CLASSIC }}
+          path: dist/${{ env.APK_CLASSIC }}
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APK_PET }}
+          path: dist/${{ env.APK_PET }}
           if-no-files-found: error
       - name: Release
-        if: env.SIGNING_KEYSTORE != ''
+        if: env.SIGNING_KEYSTORE != '' && github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$TAG" "dist/$APK_NAME" --target "$GITHUB_SHA" --title "$VERSION_NAME" $PRERELEASE --notes "Сборка из ${{ github.ref_name }}, коммит ${GITHUB_SHA::7}."
+        run: gh release create "$TAG" "dist/$APK_CLASSIC" "dist/$APK_PET" --target "$GITHUB_SHA" --title "$VERSION_NAME" $PRERELEASE --notes "Сборка из ${{ github.ref_name }}, коммит ${GITHUB_SHA::7}."

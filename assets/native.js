@@ -146,6 +146,58 @@
 
   window.claude = {use: async name => name === "db" ? db : name === "sample" ? sample : null};
 
+  /* ---------- voice (pixel version): recording -> 16 kHz mono WAV -> Gemini on odirouter -> text ---------- */
+  async function toWav(blob){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ac = new AC();
+    let buf;
+    try { buf = await ac.decodeAudioData(await blob.arrayBuffer()); } finally { try { ac.close(); } catch (e) {} }
+    const rate = 16000, len = Math.max(1, Math.ceil(buf.duration * rate));
+    const off = new OfflineAudioContext(1, len, rate);
+    const src = off.createBufferSource(); src.buffer = buf; src.connect(off.destination); src.start();
+    const pcm = (await off.startRendering()).getChannelData(0);
+    const out = new DataView(new ArrayBuffer(44 + pcm.length * 2));
+    const w = (o, t) => { for (let i = 0; i < t.length; i++) out.setUint8(o + i, t.charCodeAt(i)); };
+    w(0, "RIFF"); out.setUint32(4, 36 + pcm.length * 2, true); w(8, "WAVE"); w(12, "fmt ");
+    out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
+    out.setUint32(24, rate, true); out.setUint32(28, rate * 2, true); out.setUint16(32, 2, true); out.setUint16(34, 16, true);
+    w(36, "data"); out.setUint32(40, pcm.length * 2, true);
+    for (let i = 0; i < pcm.length; i++){ const v = Math.max(-1, Math.min(1, pcm[i])); out.setInt16(44 + i * 2, v < 0 ? v * 0x8000 : v * 0x7fff, true); }
+    const bytes = new Uint8Array(out.buffer); let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+  /* the audio model comes from the build; without one, the first free Gemini model odirouter lists (remembered) */
+  let audioModel = null;
+  async function pickAudioModel(){
+    if (audioModel) return audioModel;
+    const c = cfg();
+    if (c.audioModel) return audioModel = c.audioModel;
+    try { const m = localStorage.getItem("audioModel"); if (m) return audioModel = m; } catch (e) {}
+    const ids = ((JSON.parse(await call("models")) || {}).data || []).map(m => m.id).filter(Boolean);
+    const rank = id => (/free/i.test(id) ? 0 : 4) + (/flash/i.test(id) ? 0 : 2) + (/lite|image|tts|embed/i.test(id) ? 1 : 0);
+    const gem = ids.filter(id => /gemini/i.test(id) && !/tts|embed|image/i.test(id)).sort((a, b) => rank(a) - rank(b));
+    if (!gem.length) throw {code:"bad_model", message:"нет модели Gemini для голоса"};
+    audioModel = gem[0];
+    try { localStorage.setItem("audioModel", audioModel); } catch (e) {}
+    return audioModel;
+  }
+  window.__transcribe = async blob => {
+    if (!cfg().hasKey) throw {code:"no_key"};
+    const [data, model] = await Promise.all([toWav(blob), pickAudioModel()]);
+    const body = {model, max_tokens: 1024, messages: [{role:"user", content: [
+      {type:"text", text:"Это голосовое сообщение для дневника питания на русском. Запиши дословно, что сказано, обычным текстом, без пояснений и кавычек. Если речи нет, верни пустую строку."},
+      {type:"input_audio", input_audio:{data, format:"wav"}}
+    ]}]};
+    let raw;
+    try { raw = await call("chat", body, false); }
+    catch (e) { if (e && e.code === "bad_model" && !cfg().audioModel){ audioModel = null; try { localStorage.removeItem("audioModel"); } catch (x) {} } throw e; }
+    const msg = ((JSON.parse(raw) || {}).choices || [])[0];
+    let t = msg && msg.message && msg.message.content;
+    if (Array.isArray(t)) t = t.map(p => p.text || "").join("");
+    return String(t || "").trim().replace(/^["«]|["»]$/g, "");
+  };
+
   /* ---------- settings sheet ---------- */
   const css = `
 .gear{border:1px solid var(--line);background:var(--surface);border-radius:8px;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);padding:0}
@@ -166,6 +218,7 @@
   const st = document.createElement("style"); st.textContent = css; document.head.append(st);
 
   let sheet = null;
+  const PET = () => !!document.getElementById("petScreen");
   const esc = t => String(t || "").replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
   const MEALS = ["Завтрак", "Обед", "Перекус", "Ужин"];
   const hm = r => String(r.h).padStart(2, "0") + ":" + String(r.m).padStart(2, "0");
@@ -191,7 +244,7 @@
     if (sheet) return;
     const c = cfg();
     const back = document.createElement("div"); back.className = "sheetBack";
-    back.innerHTML = `<div class="sheet" role="dialog" aria-label="Настройки">
+    back.innerHTML = `<div class="sheet${PET() ? " px" : ""}" role="dialog" aria-label="Настройки">
       <div id="sAi" style="display:flex;flex-direction:column;gap:12px"${c.builtIn ? " hidden" : ""}>
       <h2>Настройки ИИ</h2>
       <label class="field">Ключ odirouter<input id="sKey" type="password" autocomplete="off" placeholder="${c.hasKey ? "Ключ сохранён, введи новый, чтобы заменить" : "Вставь ключ"}"></label>
@@ -268,12 +321,22 @@
   window.__focusAdd = () => {
     const t = document.getElementById("foodText"); if (!t) return;
     if (window.__goToday) window.__goToday();
+    if (PET() && typeof window.openChat === "function"){ window.openChat(true); setTimeout(() => t.focus(), 50); return; }
     t.scrollIntoView({block: "center"}); t.focus();
   };
   window.__pushToday = o => { try { N.pushToday(JSON.stringify(o)); } catch (e) {} };
 
   document.addEventListener("DOMContentLoaded", () => {
     const top = document.querySelector(".top");
+    /* pixel version: settings live in the pet menu */
+    const pm = document.querySelector("#petMenu .modalBox");
+    if (pm){
+      const h = document.createElement("h3"); h.textContent = "Приложение";
+      const p = document.createElement("p"); p.className = "hint"; p.textContent = "Напоминания о еде и копия записей.";
+      const b = document.createElement("button"); b.type = "button"; b.className = "small"; b.textContent = "Настройки";
+      b.onclick = () => { document.getElementById("petMenu").hidden = true; openSettings(); };
+      pm.append(h, p, b);
+    }
     if (top){
       const g = document.createElement("button");
       g.type = "button"; g.className = "gear"; g.setAttribute("aria-label", "Настройки");
