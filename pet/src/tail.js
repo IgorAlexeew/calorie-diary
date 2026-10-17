@@ -167,6 +167,17 @@ $("#petCv").parentElement.onclick = () => {
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   let f = 0, lastTag = "";
   try { const l = JSON.parse(localStorage.getItem("petLine") || "null"); if (l && l.d === todayKey() && l.t) setLine(l.t); } catch (e) {}
+  /* the top row of the pet's head when standing still, cached per look */
+  let headKey = "", headVal = 4;
+  function headRow(p, look){
+    const key = JSON.stringify([p, look.stage, look.branch, look.fat > 70, look.fat < 30]);
+    if (key !== headKey){
+      headKey = key;
+      if (look.stage === "egg") headVal = 10;
+      else { const g = PetEngine.sprite(p, {...look, state: "idle", moving: false}, 1); headVal = g.findIndex(r => r.some(Boolean)); if (headVal < 0) headVal = 4; }
+    }
+    return headVal;
+  }
   function tick(){
     const {pet: p, look} = petLook();
     /* size the world to the screen; the ground lies just under the free space between the HUD panels */
@@ -176,9 +187,16 @@ $("#petCv").parentElement.onclick = () => {
       if (cv.width !== W * S || cv.height !== H * S){ cv.width = W * S; cv.height = H * S; cv.style.width = W * S / dpr + "px"; cv.style.height = H * S / dpr + "px"; }
       /* the pet stands a little below the top block, never lower than the free space */
       const sp = $("#petSpace").getBoundingClientRect(), toLog = y => Math.round((y - wr.top) * dpr / S);
-      const ground = Math.max(32, Math.min(H - 2, toLog(sp.bottom), toLog(sp.top) + 34));
+      const say = $("#petSay"), sayH = say.offsetHeight + 22, head = headRow(p, look);
+      /* room above the head for the speech bubble, then the pet, then the ground */
+      const ground = Math.max(32, Math.min(H - 2, toLog(sp.bottom), toLog(sp.top) + Math.ceil(sayH * dpr / S) + 34 - head + 2));
       const skyTop = toLog($(".topCard").getBoundingClientRect().bottom);
       PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop});
+      /* the bubble sits right above the pet's head, its tail pointing down at it */
+      const hr = $("#hud").getBoundingClientRect(), headY = wr.top + (ground - 30 + head) * S / dpr - hr.top;
+      const cx = wr.left + (Math.floor((W - 48) / 2) + 24) * S / dpr - hr.left;
+      const top = Math.max(sp.top - hr.top, headY - sayH);
+      say.style.top = Math.round(top) + "px"; say.style.left = Math.round(cx) + "px"; say.style.visibility = "visible";
     }
     const tag = look.stage === "egg" ? "" : (look.toy === "dance" && look.state === "play" ? "Танцует" : STATE_TAG[look.state] || "");
     if (tag !== lastTag){ const t = $("#sceneTag"); t.hidden = !tag; t.textContent = tag; lastTag = tag; }

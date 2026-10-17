@@ -84,7 +84,7 @@ h3{font-size:16px;margin:6px 0 0}
 .idLine .streak{color:var(--over)}
 /* the pet's line: a white speech bubble whose pixel tail points down at the pet */
 .hudTop{display:flex;flex-direction:column;gap:10px}
-.hud .say{position:relative;margin:0 0 20px;align-self:center;max-width:100%;background:#FFFFFF;color:#1B1F24;border:3px solid #1B1F24;box-shadow:3px 3px 0 rgba(14,16,22,.45);
+.hud .say{position:absolute;left:50%;top:0;width:max-content;max-width:min(496px,calc(100% - 24px));transform:translateX(-50%);margin:0;visibility:hidden;background:#FFFFFF;color:#1B1F24;border:3px solid #1B1F24;box-shadow:3px 3px 0 rgba(14,16,22,.45);
   padding:8px 12px;min-height:0;font-size:17px;line-height:1.4;text-align:center}
 .hud .say.loading #petSayText{color:#5B635E}
 .hud .say::before,.hud .say::after{content:"";position:absolute;left:50%;transform:translateX(-50%);display:block}

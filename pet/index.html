@@ -332,7 +332,7 @@ h3{font-size:16px;margin:6px 0 0}
 .idLine .streak{color:var(--over)}
 /* the pet's line: a white speech bubble whose pixel tail points down at the pet */
 .hudTop{display:flex;flex-direction:column;gap:10px}
-.hud .say{position:relative;margin:0 0 20px;align-self:center;max-width:100%;background:#FFFFFF;color:#1B1F24;border:3px solid #1B1F24;box-shadow:3px 3px 0 rgba(14,16,22,.45);
+.hud .say{position:absolute;left:50%;top:0;width:max-content;max-width:min(496px,calc(100% - 24px));transform:translateX(-50%);margin:0;visibility:hidden;background:#FFFFFF;color:#1B1F24;border:3px solid #1B1F24;box-shadow:3px 3px 0 rgba(14,16,22,.45);
   padding:8px 12px;min-height:0;font-size:17px;line-height:1.4;text-align:center}
 .hud .say.loading #petSayText{color:#5B635E}
 .hud .say::before,.hud .say::after{content:"";position:absolute;left:50%;transform:translateX(-50%);display:block}
@@ -464,8 +464,8 @@ svg text{font-size-adjust:.5!important}
           </span>
         </div>
         </div>
-        <p class="say" id="petSay" aria-live="polite"><span id="petSayText">…</span></p>
       </header>
+      <p class="say" id="petSay" aria-live="polite"><span id="petSayText">…</span></p>
 
       <div class="petSpace" id="petSpace" aria-hidden="true"></div>
 
@@ -2746,6 +2746,17 @@ $("#petCv").parentElement.onclick = () => {
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   let f = 0, lastTag = "";
   try { const l = JSON.parse(localStorage.getItem("petLine") || "null"); if (l && l.d === todayKey() && l.t) setLine(l.t); } catch (e) {}
+  /* the top row of the pet's head when standing still, cached per look */
+  let headKey = "", headVal = 4;
+  function headRow(p, look){
+    const key = JSON.stringify([p, look.stage, look.branch, look.fat > 70, look.fat < 30]);
+    if (key !== headKey){
+      headKey = key;
+      if (look.stage === "egg") headVal = 10;
+      else { const g = PetEngine.sprite(p, {...look, state: "idle", moving: false}, 1); headVal = g.findIndex(r => r.some(Boolean)); if (headVal < 0) headVal = 4; }
+    }
+    return headVal;
+  }
   function tick(){
     const {pet: p, look} = petLook();
     /* size the world to the screen; the ground lies just under the free space between the HUD panels */
@@ -2755,9 +2766,16 @@ $("#petCv").parentElement.onclick = () => {
       if (cv.width !== W * S || cv.height !== H * S){ cv.width = W * S; cv.height = H * S; cv.style.width = W * S / dpr + "px"; cv.style.height = H * S / dpr + "px"; }
       /* the pet stands a little below the top block, never lower than the free space */
       const sp = $("#petSpace").getBoundingClientRect(), toLog = y => Math.round((y - wr.top) * dpr / S);
-      const ground = Math.max(32, Math.min(H - 2, toLog(sp.bottom), toLog(sp.top) + 34));
+      const say = $("#petSay"), sayH = say.offsetHeight + 22, head = headRow(p, look);
+      /* room above the head for the speech bubble, then the pet, then the ground */
+      const ground = Math.max(32, Math.min(H - 2, toLog(sp.bottom), toLog(sp.top) + Math.ceil(sayH * dpr / S) + 34 - head + 2));
       const skyTop = toLog($(".topCard").getBoundingClientRect().bottom);
       PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop});
+      /* the bubble sits right above the pet's head, its tail pointing down at it */
+      const hr = $("#hud").getBoundingClientRect(), headY = wr.top + (ground - 30 + head) * S / dpr - hr.top;
+      const cx = wr.left + (Math.floor((W - 48) / 2) + 24) * S / dpr - hr.left;
+      const top = Math.max(sp.top - hr.top, headY - sayH);
+      say.style.top = Math.round(top) + "px"; say.style.left = Math.round(cx) + "px"; say.style.visibility = "visible";
     }
     const tag = look.stage === "egg" ? "" : (look.toy === "dance" && look.state === "play" ? "Танцует" : STATE_TAG[look.state] || "");
     if (tag !== lastTag){ const t = $("#sceneTag"); t.hidden = !tag; t.textContent = tag; lastTag = tag; }
