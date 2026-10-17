@@ -276,7 +276,12 @@
     if (st === "sleep"){ const mw = (T.mouth[mouth] || T.mouth.flat)[0].length; px.bubble = [16 + mw / 2 + sway, my]; }
 
     /* branch and state accessories */
-    if (br === "athlete" && !lying){ const y = eyeY - 2; for (let x = 0; x < G; x++) if (body[y] && body[y][x]) put(x, y, "#E0475B"); }
+    if (br === "athlete" && !lying){
+      /* the headband takes whichever colour stands out most against this pet's body */
+      const rgb = c => { const n = parseInt(c.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }, m = rgb(main);
+      const band = ["#E0475B", "#2F6FD0", "#F5C842", "#F2F2F2"].reduce((a, c) => { const d = q => rgb(q).reduce((t, v, i) => t + (v - m[i]) ** 2, 0); return d(c) > d(a) ? c : a; });
+      const y = eyeY - 2; for (let x = 0; x < G; x++) if (body[y] && body[y][x]) put(x, y, band);
+    }
     if (br === "lazy" && st !== "happy" && !lying){ const t = top - 1; [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [1, -1], [2, -1], [3, -1], [4, -1], [2, -2], [3, -2], [4, -3], [5, -3]].forEach(([a, b]) => put(13 + a + sway, t + b, b === 0 ? "#F2E8CF" : "#5B6CC2")); put(18 + sway, t - 4, "w"); }
     if (br === "donut") [[L(H - 1) - 3, bot], [R(H - 1) + 4, bot - 1], [L(H - 1) - 2, bot + 2]].forEach(([x, y]) => put(x, y, "#C98B4B"));
     if (br === "balanced" && (f % 12) < 6){ put(L(0) - 3, top + 1, "#F5C842"); put(R(2) + 3, top + 4, "#F5C842"); put(L(0) - 3, top, "w"); }
