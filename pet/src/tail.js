@@ -175,7 +175,7 @@ function renderCookChips(){
   if (chatBusy || $("#chatSheet").dataset.open !== "true") return;
   const key = chipsKey();
   if (key !== aiChipsKey) loadChips(key);
-  if (aiChipsBusy && !aiChips){ box.append(el("span",{class:"hint chipWait",text:"Подбираю подсказки…"})); return; }
+  if (aiChipsBusy && !aiChips) return;
   for (const ch of aiChips || []){
     const b = el("button",{type:"button",class:"chip" + (ch.text ? " ghost" : ""),text: ch.label});
     b.onclick = () => {
