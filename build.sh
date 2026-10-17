@@ -8,7 +8,7 @@ prop() { local v="${!1:-}"; [ -z "$v" ] && [ -f "$A/secrets.properties" ] && v=$
 KEY=$(prop ODIROUTER_API_KEY ""); MODEL=$(prop ODIROUTER_MODEL free-vclaude-haiku-4.5); BASE=$(prop ODIROUTER_BASE https://api.odirouter.ai/v1)
 KS=$(prop SIGNING_KEYSTORE "$A/signing/release.p12"); PW=$(prop SIGNING_PASSWORD "")
 [ -z "$PW" ] && [ -f "$(dirname "$KS")/password.txt" ] && PW=$(cat "$(dirname "$KS")/password.txt")
-VC=$(grep -oP "versionCode \K\d+" "$A/build.gradle"); VN=$(grep -oP "versionName '\K[^']+" "$A/build.gradle")
+VC=$(prop VERSION_CODE "$(grep -oP "'VERSION_CODE', '\K\d+" "$A/build.gradle")"); VN=$(prop VERSION_NAME "$(grep -oP "'VERSION_NAME', '\K[^']+" "$A/build.gradle")")
 jstr() { python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"; }
 
 rm -rf "$O" && mkdir -p "$O/res" "$O/classes" "$O/gen/app/caloriediary"

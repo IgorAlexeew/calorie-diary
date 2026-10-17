@@ -17,8 +17,9 @@ android {
         applicationId 'app.caloriediary'
         minSdk 24
         targetSdk 34
-        versionCode 2
-        versionName '1.1'
+        // CI passes VERSION_CODE (grows with every run, so each APK installs over the previous one) and VERSION_NAME
+        versionCode conf('VERSION_CODE', '2').toInteger()
+        versionName conf('VERSION_NAME', '1.1')
         buildConfigField 'String', 'API_KEY', quoted(conf('ODIROUTER_API_KEY', ''))
         buildConfigField 'String', 'MODEL', quoted(conf('ODIROUTER_MODEL', 'free-vclaude-haiku-4.5'))
         buildConfigField 'String', 'API_BASE', quoted(conf('ODIROUTER_BASE', 'https://api.odirouter.ai/v1'))

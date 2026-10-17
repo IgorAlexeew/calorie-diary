@@ -1,9 +1,15 @@
 name: APK
 
+# main    -> release "v<version>.<run>",          calorie-diary-<version>.<run>.apk
+# develop -> pre-release "dev-<version>.<run>",   dev-calorie-diary-<version>.<run>.apk
+# Both use the same package and key, so a dev build installs over a release build and back.
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -17,6 +23,18 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
+      - name: Version
+        run: |
+          BASE=$(grep -oP "'VERSION_NAME', '\K[^']+" build.gradle)
+          VERSION="$BASE.${{ github.run_number }}"
+          if [ "${{ github.ref_name }}" = "main" ]; then PREFIX=""; TAG="v$VERSION"; else PREFIX="dev-"; TAG="dev-$VERSION"; fi
+          {
+            echo "VERSION_CODE=$((100 + ${{ github.run_number }}))"
+            echo "VERSION_NAME=$PREFIX$VERSION"
+            echo "APK_NAME=${PREFIX}calorie-diary-$VERSION.apk"
+            echo "TAG=$TAG"
+            echo "PRERELEASE=$([ -n "$PREFIX" ] && echo --prerelease || true)"
+          } >> "$GITHUB_ENV"
       - name: Restore signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
@@ -36,8 +54,15 @@ jobs:
         run: |
           if [ -z "$ODIROUTER_API_KEY" ]; then echo "::warning::ODIROUTER_API_KEY is not set, the key will have to be entered in the app"; fi
           gradle assembleRelease --no-daemon --stacktrace
+          APK=$(ls build/outputs/apk/release/*.apk | head -1)
+          mkdir -p dist && cp "$APK" "dist/$APK_NAME"
       - uses: actions/upload-artifact@v4
         with:
-          name: calorie-diary
-          path: build/outputs/apk/release/*.apk
+          name: ${{ env.APK_NAME }}
+          path: dist/${{ env.APK_NAME }}
           if-no-files-found: error
+      - name: Release
+        if: env.SIGNING_KEYSTORE != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$TAG" "dist/$APK_NAME" --target "$GITHUB_SHA" --title "$VERSION_NAME" $PRERELEASE --notes "Сборка из ${{ github.ref_name }}, коммит ${GITHUB_SHA::7}."
