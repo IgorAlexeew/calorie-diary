@@ -1,6 +1,6 @@
 /* ---------- the pet: stats from the diary, its state, AI lines, hatching ---------- */
 let pet = null, petLoaded = false, hatching = null;
-let petDemo = null, petEvt = null, petStatsNow = null, petLookDemo = null;
+let petDemo = null, petEvt = null, petStatsNow = null, petLookDemo = null, petPokes = 0;
 const STAT_DEFS = [
   {k:"health", label:"Здоровье",   icon:"heart",    c:"var(--s-health)"},
   {k:"shape",  label:"Форма",      icon:"scale",    c:"var(--s-shape)"},
@@ -18,8 +18,8 @@ const BRANCH_RU = {
   grump:    ["Ворчун", "здоровье ниже 40"]
 };
 const STATE_RU = {idle:"спокоен", play:"играет, потому что ему хорошо", eat:"ест то, что хозяин только что записал", happy:"радуется, его погладили",
-  sad:"грустит из-за перебора калорий", hungry:"голоден", sick:"болеет", sleep:"спит", hibernate:"в спячке, потому что три дня не было записей"};
-const STATE_TAG = {play:"Играет", eat:"Ест", happy:"Радуется", sad:"Грустит", hungry:"Голоден", sick:"Болеет", sleep:"Спит", hibernate:"Спячка"};
+  sad:"грустит из-за перебора калорий", tickle:"хохочет от щекотки", angry:"сердится, что его тыкают", shy:"смущается от внимания", hungry:"голоден", sick:"болеет", sleep:"спит", hibernate:"в спячке, потому что три дня не было записей"};
+const STATE_TAG = {tickle:"Хохочет", angry:"Злится", shy:"Смущается", play:"Играет", eat:"Ест", happy:"Радуется", sad:"Грустит", hungry:"Голоден", sick:"Болеет", sleep:"Спит", hibernate:"Спячка"};
 const clamp = (v, a, b) => Math.max(a == null ? 0 : a, Math.min(b == null ? 100 : b, v));
 const pick = a => a[Math.floor(Math.random() * a.length)];
 
@@ -126,6 +126,18 @@ function setLine(t, loading){
   $("#petSay").classList.toggle("loading", !!loading);
   if (!loading) try { localStorage.setItem("petLine", JSON.stringify({t, d: todayKey()})); } catch (e) {}
 }
+/* how the pet takes being poked again and again: set at hatching, so the AI knows how to react */
+const TOUCH = {
+  ticklish: {state: "tickle", ru: "боится щекотки: от частых тычков хохочет и извивается"},
+  grumpy:   {state: "angry",  ru: "не любит, когда тыкают: от частых тычков сердится и ворчит"},
+  shy:      {state: "shy",    ru: "стеснительный: от частых тычков краснеет и прячет лицо"},
+  cuddly:   {state: "happy",  ru: "обожает ласку: чем больше тыкают, тем больше радуется"}
+};
+function petTouch(){
+  if (pet && TOUCH[pet.touch]) return pet.touch;
+  const k = Object.keys(TOUCH), n = [...String(pet && pet.name || "")].reduce((a, c) => a + c.charCodeAt(0), 0);
+  return k[n % k.length];
+}
 /* how the pet talks: a baby babbles, a young one gets most words right, an adult speaks plainly with a little accent */
 const SPEECH = {
   baby: {max: 32, rule: "Ты совсем малыш и только учишься говорить: 2–4 слова, путаешь порядок слов и формы («есть хочую», «ты не ням-ням», «много сладкое плохо»), говоришь о себе по имени или «моя», вставляешь звуки-слоги, не только гласные, но и с согласными (мо, ку, фа, пип, мур, бзз, пур-пур, ням). Можешь выдумывать свои словечки, но смысл фразы должен легко угадываться. Никаких цифр и длинных слов."},
@@ -134,7 +146,7 @@ const SPEECH = {
 };
 function localLine(s, st){
   if (!pet) return hatching ? "Тук-тук… Кто-то вылупляется!" : "Запиши первую еду в чат, и я вылуплюсь.";
-  const stage = petStage(petAge());
+  const stage = petStage(petAge()), baby = stage === "baby";
   const L = {
     baby: {hibernate: "Хр-р… моя спать долго-мо…", sleep: "Хр-р… мур-мур…", eat: "Ням-ням! Вкусно фа!", hungry: "Пур-пур, есть хочую! Ку?", sad: "Ой. Много ням. Живот бух.",
       sick: "Моя плохо… пип-пип…", play: "Уи! Играть-ку! Хорошо моя!", idle: s.left > 0 ? "Ням ещё можно. Мо?" : "Хватит ням. Фа-фа."},
@@ -143,7 +155,9 @@ function localLine(s, st){
     adult: {hibernate: "Хр-р… Запиши еду, и я проснусь.", sleep: "Хр-р… До завтра.", eat: "Хрум-хрум! Спасибо!", hungry: "Пур… Где моя еда? Я голоден.", sad: `Перебор на ${-s.left} ккал. Живот тяжёлый…`,
       sick: "Мне нехорошо. Давай поедим по норме?", play: "Играю! Мне сегодня хорошо.", idle: s.left > 0 ? `До нормы ещё ${s.left} ккал.` : "На сегодня хватит еды."}
   }[stage] || {};
-  return L[st] || L.idle;
+  const R = baby ? {tickle: "Хи-хи-ку! Щекотно-мо!", angry: "Фр-р! Не тыкай моя! Бзз!", shy: "Ой… мо… стесняюсь…"}
+    : {tickle: "Ха-ха! Щекотно, хватит!", angry: "Фр! Перестань тыкать.", shy: "Ой… ну ты чего… смущаюсь."};
+  return R[st] || L[st] || L.idle;
 }
 async function requestLine(reason, force){
   if (!pet || !sample || lineBusy || !petStatsNow) return;
@@ -151,7 +165,7 @@ async function requestLine(reason, force){
   if (!force && Date.now() - lineAt < 90000) return;
   lineBusy = true; lineAt = Date.now();
   const s = petStatsNow, st = petState(s), stage = petStage(petAge()), br = petBranch(s, stage);
-  const why = {eat:"хозяин только что записал еду", tap:"хозяин тебя погладил", state:"твоё состояние изменилось", open:"хозяин открыл приложение", hatch:"ты только что вылупился"}[reason] || "просто так";
+  const why = {poke: `хозяин тыкает в тебя уже ${petPokes} раз подряд, а ты ${TOUCH[petTouch()].ru}`, eat:"хозяин только что записал еду", tap:"хозяин тебя погладил", state:"твоё состояние изменилось", open:"хозяин открыл приложение", hatch:"ты только что вылупился"}[reason] || "просто так";
   const prompt = `Ты — ${pet.name}, 8-битный питомец в дневнике питания хозяина. Характер: ${pet.trait || "добрый и любопытный"}. Стадия: ${STAGE_RU[stage]}${br ? ", ветка развития «" + BRANCH_RU[br][0] + "»" : ""}.
 Сейчас ${new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}. Ты ${STATE_RU[st] || "спокоен"}.
 Шкалы от 0 до 100: здоровье ${s.health}, форма ${s.shape}, мышцы ${s.muscle}, настроение ${s.mood}, сытость ${s.food}.
@@ -176,15 +190,16 @@ async function genPetAI(parts){
   const prompt = `Ты придумываешь характер 8-битному питомцу из игры-дневника питания. Детали уже выпали случайно:
 тело ${parts.body}, уши или макушка ${parts.ears}, глаза ${parts.eyes}, рот ${parts.mouth}, хвост ${parts.tail}, узор ${parts.pattern}, цвет ${parts.palette}.
 Придумай имя, которое подходит к этому облику, характер и первую фразу. Случайное число для разнообразия: ${Math.floor(Math.random() * 1e6)}.
-Ответь только JSON: {"name":"короткое русское имя, одно слово до 10 букв, можно съедобное","trait":"характер, 3–6 слов","greeting":"первая фраза хозяину, как говорит только что вылупившийся малыш: 2–4 слова, ломаная речь, звук вроде пур-пур или уи"}`;
+Ответь только JSON: {"name":"короткое русское имя, одно слово до 10 букв, можно съедобное","trait":"характер, 3–6 слов","touch":"как реагирует, если его часто тыкать: ticklish (щекотно), grumpy (сердится), shy (смущается) или cuddly (радуется); подбери под характер","greeting":"первая фраза хозяину, как говорит только что вылупившийся малыш: 2–4 слова, ломаная речь, звук вроде пур-пур или уи"}`;
   const r = await sample.json(prompt, {modelTier:"quick", cache:false});
-  return r && typeof r === "object" ? cleanPet({...parts, name: r.name, trait: r.trait, greeting: r.greeting}) : null;
+  return r && typeof r === "object" ? cleanPet({...parts, name: r.name, trait: r.trait, greeting: r.greeting, touch: r.touch}) : null;
 }
 function cleanPet(r){
   const P = PetEngine.PARTS, out = {};
   for (const k in P) out[k] = P[k].includes(r && r[k]) ? r[k] : pick(P[k]);
   out.name = str(r && r.name, 14).replace(/[^\p{L}\- ]/gu, "").trim() || pick(PetEngine.NAMES);
   out.trait = str(r && r.trait, 60);
+  out.touch = TOUCH[r && r.touch] ? r.touch : pick(Object.keys(TOUCH));
   out.greeting = str(r && r.greeting, 120);
   out.born = /^\d{4}-\d{2}-\d{2}$/.test(r && r.born) ? r.born : todayKey();
   out.gen = Math.max(1, round(r && r.gen) || 1);

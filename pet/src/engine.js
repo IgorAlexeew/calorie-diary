@@ -81,7 +81,8 @@
       closed: ["..", "kk"],
       joy:    [".k.", "k.k"],
       x:      ["k.k", ".k.", "k.k"],
-      sad:    ["k..", ".kk"]
+      sad:    ["k..", ".kk"],
+      angry:  ["kk.", ".kk"]
     },
     mouth: {
       smile:  ["k..k", ".kk."],
@@ -149,7 +150,11 @@
     if (st === "play" && look.toy !== "dance"){ jump = [0, -1, -2, -1, 0, 0][f % 6]; squash = f % 6 === 4; }
     if (st === "play" && look.toy === "dance") sway = [-1, -1, 0, 1, 1, 0][f % 6];
     if (st === "sick") sway = [0, 0, 1, 1, 0, 0, -1, -1][f % 8];
-    if (["idle", "hungry", "sad", "sick"].includes(st)) squash = (f >> 2) % 2 === 1;
+    /* reactions to being poked a lot: a ticklish pet wriggles, a grumpy one shakes, a shy one sways */
+    if (st === "tickle"){ sway = [-1, 1][f % 2]; jump = [0, -1][(f >> 1) % 2]; }
+    if (st === "angry") sway = [0, 1, 0, -1][f % 4];
+    if (st === "shy") sway = [0, 0, -1, -1][(f >> 1) % 4];
+    if (["idle", "hungry", "sad", "sick", "shy"].includes(st)) squash = (f >> 2) % 2 === 1;
     if (st === "sleep" || st === "hibernate") squash = (f >> 3) % 2 === 1;
     const lying = st === "hibernate";
 
@@ -235,6 +240,9 @@
       if (st === "happy" || st === "eat" || (st === "play" && look.toy !== "dance")){ pl = pr = "up"; }
       else if (st === "play"){ const a = (f % 6) < 3; pl = a ? "up" : "down"; pr = a ? "down" : "up"; }
       else if (st === "hungry"){ pl = "belly"; pr = alt ? "out" : "down"; }
+      else if (st === "tickle"){ pl = f % 2 ? "up" : "belly"; pr = f % 2 ? "belly" : "up"; }
+      else if (st === "angry"){ pl = pr = alt ? "out" : "down"; }
+      else if (st === "shy"){ pl = pr = "belly"; }
       else if (st === "idle"){ if (f % 40 > 33) pr = (f >> 1) % 2 ? "up" : "out"; else { pl = alt ? "swing" : "down"; pr = alt ? "down" : "swing"; } }
       for (const s of [-1, 1]){
         const pose = s < 0 ? pl : pr, x = s < 0 ? L(si) : R(si);
@@ -249,7 +257,9 @@
     const ei = rowAt(baby ? 4 : 4 + Math.floor((H - 11) / 3)), eyeY = top + ei;
     const blink = (f % 30) === 0;
     let eye = T.eye[pet.eyes] ? pet.eyes : "dot";
-    if (st === "sleep" || st === "hibernate" || blink) eye = "closed";
+    if (st === "sleep" || st === "hibernate" || st === "shy" || blink) eye = "closed";
+    else if (st === "tickle") eye = "joy";
+    else if (st === "angry") eye = "angry";
     else if (st === "happy" || st === "play" || (st === "eat" && (f % 4) > 1)) eye = "joy";
     else if (st === "sick") eye = "x";
     else if (st === "sad") eye = "sad";
@@ -261,9 +271,14 @@
     if (!(st === "sleep" || st === "hibernate" || st === "sick" || st === "sad")){
       const x = 15 - g - ew + sway, y = eyeY + eyeH;
       if (x > L(rowAt(ei + eyeH))) { put(x, y, "#F59AB0"); put(MIR(x) + 2 * sway, y, "#F59AB0"); }
+      /* a shy pet blushes hard, a cross one goes red */
+      if (st === "shy" || st === "angry") for (const dx of [0, 1]) for (const dy of [0, 1]){ const c = st === "shy" ? "#F59AB0" : "#E86A6A"; if (x + dx > L(rowAt(ei + eyeH + dy))) { put(x + dx, y + dy, c); put(MIR(x + dx) + 2 * sway, y + dy, c); } }
     }
     let mouth = T.mouth[pet.mouth] ? pet.mouth : "smile";
     if (st === "eat") mouth = (f % 4) < 2 ? "open" : "chew";
+    else if (st === "tickle") mouth = "open";
+    else if (st === "angry") mouth = f % 4 < 2 ? "frown" : "flat";
+    else if (st === "shy") mouth = "flat";
     else if (st === "hungry") mouth = (f >> 2) % 2 ? "open" : "frown";
     else if (st === "sad" || st === "sick" || br === "grump") mouth = "frown";
     else if (st === "sleep") mouth = "flat";
@@ -448,6 +463,8 @@
       drawFood(ctx, look.food || "apple", fx, fy - drop, S, eaten);
       if (eaten > 0 && f % 3 === 0){ ctx.fillStyle = FOOD_COL.t; ctx.fillRect((fx + 8 - eaten * 8) * S, (fy + 9 + (f % 2)) * S, S, S); }
     }
+    if (st === "angry"){ const ax = 30, ay = 12 - (f >> 1) % 2; [[0,0],[2,0],[1,1],[0,2],[2,2]].forEach(([a, b]) => { ctx.fillStyle = "#E0475B"; ctx.fillRect((ax + a) * S, (ay + b) * S, S, S); }); if (f % 4 < 2){ ctx.fillStyle = "rgba(255,255,255,.8)"; ctx.fillRect(13 * S, 10 * S, 2 * S, S); ctx.fillRect(33 * S, 9 * S, 2 * S, S); } }
+    if (st === "tickle") for (let k = 0; k < 2; k++){ const t = (f + k * 5) % 10; ctx.fillStyle = "#F5C842"; ctx.fillRect((k ? 34 : 12) * S, (16 - t) * S, S, S); ctx.fillRect((k ? 35 : 11) * S, (17 - t) * S, S, S); }
     if (st === "sad") icon(ctx, "drop", (34 + (f % 2)) * S, 14 * S, "#6AB3F0", S * .7 | 0 || 1);
     if (st === "hungry"){ ctx.fillStyle = "#FFFFFF"; ctx.fillRect(33 * S, 3 * S, 12 * S, 12 * S); ctx.fillRect(31 * S, 14 * S, 2 * S, 2 * S); drawFood(ctx, look.food || "apple", 35, 5, S, 0); }
     if (st === "play" && look.toy !== "dance"){ icon(ctx, "ball", bx * S, byy * S, "#E0475B", S); ctx.fillStyle = "#FFFFFF"; ctx.fillRect((bx + 1) * S, (byy + 1) * S, S, S); }

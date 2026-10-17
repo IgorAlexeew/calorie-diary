@@ -113,14 +113,14 @@ $("#petMenu").addEventListener("click", e => { if (e.target === e.currentTarget)
 $("#petMenuBtn").onclick = () => {
   const info = $("#pmInfo"); info.replaceChildren();
   const s = petStatsNow || petStats(), age = petAge(), stage = petStage(age), br = petBranch(s, stage);
-  const rows = pet ? [["Имя", pet.name], ["Характер", pet.trait || "—"], ["Стадия", `${STAGE_RU[stage]}, дней с записями: ${age}`],
+  const rows = pet ? [["Имя", pet.name], ["Характер", pet.trait || "—"], ["Если тыкать", TOUCH[petTouch()].ru.split(":")[0]], ["Стадия", `${STAGE_RU[stage]}, дней с записями: ${age}`],
     ["Ветка", br ? `${BRANCH_RU[br][0]}: ${BRANCH_RU[br][1]}` : "появится с 7 дней"], ["Опыт", `${petXp()}, уровень ${petLevel(petXp())}`],
     ["Поколение", String(pet.gen || 1)]] : [["Яйцо", "вылупится после первой записи еды"]];
   const dl = el("dl",{class:"pmInfo"}); for (const [a, b] of rows) dl.append(el("dt",{text:a}), el("dd",{text:b}));
   info.append(dl);
   $("#petMenu").hidden = false;
 };
-const DEMO = [["Ест","eat"],["Играет с мячом","play","ball"],["Танцует","play","dance"],["Радуется","happy"],["Грустит","sad"],["Голоден","hungry"],["Болеет","sick"],["Спит","sleep"],["Спячка","hibernate"]];
+const DEMO = [["Хохочет","tickle"],["Злится","angry"],["Смущается","shy"],["Ест","eat"],["Играет с мячом","play","ball"],["Танцует","play","dance"],["Радуется","happy"],["Грустит","sad"],["Голоден","hungry"],["Болеет","sick"],["Спит","sleep"],["Спячка","hibernate"]];
 for (const [t, st, toy] of DEMO){
   const b = el("button",{type:"button",text:t});
   b.onclick = () => { if (!pet) return; petDemo = {state: st, toy, until: Date.now() + 6000, dur: 6000, food: st === "eat" ? pick(Object.keys(PetEngine.FOOD)) : null}; setLine(localLine(petStatsNow, st)); closeMenu(); showScreen("pet"); };
@@ -157,12 +157,19 @@ AGES.forEach(([t, v], i) => {
 })();
 
 /* ---------- tapping the pet ---------- */
+let pokes = [], lastPokeLine = 0;
 $("#petCv").parentElement.onclick = () => {
   if (!pet){ if (!hatching){ petEvt = {state: "idle", until: Date.now() + 800}; setLine(localLine(petStatsNow || {}, "idle")); } return; }
   const st = petStatsNow ? petState(petStatsNow) : "idle";
   if (st === "sleep" || st === "hibernate"){ setLine(st === "sleep" ? "Хр-р… Не буди, я сплю." : "Хр-р… Запиши еду, и я проснусь."); return; }
-  petEvent("happy", 1600);
-  requestLine("tap", Date.now() - lineAt > 15000);
+  /* a single tap is a pat; three or more quick taps get the pet's own reaction */
+  const now = Date.now();
+  pokes = pokes.filter(t => now - t < 2500); pokes.push(now); petPokes = pokes.length;
+  if (pokes.length < 3){ petEvent("happy", 1600); requestLine("tap", now - lineAt > 15000); return; }
+  const r = TOUCH[petTouch()];
+  petEvent(r.state, 2600);
+  setLine(localLine(petStatsNow, r.state));
+  if (now - lastPokeLine > 5000){ lastPokeLine = now; lineAt = 0; requestLine("poke", true); }
 };
 
 /* ---------- the animation loop: 6 frames a second, like old consoles ---------- */
