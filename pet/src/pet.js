@@ -100,10 +100,11 @@ function isNight(hour){
   const h = hour < 12 ? hour + 24 : hour;
   return h >= b && h < 31;
 }
-function petState(s){
+/* base: the lasting state, without short events (eating, a pat, a poke) and the menu demo */
+function petState(s, base){
   const now = Date.now();
-  if (petDemo && petDemo.until > now) return petDemo.state;
-  if (petEvt && petEvt.until > now) return petEvt.state;
+  if (!base && petDemo && petDemo.until > now) return petDemo.state;
+  if (!base && petEvt && petEvt.until > now) return petEvt.state;
   if (s.idleDays != null && s.idleDays >= 3 && !isLogged(s.today)) return "hibernate";
   if (isNight(s.hour)) return "sleep";
   if (s.health < 30) return "sick";
@@ -116,7 +117,8 @@ function petToy(){ if (petDemo && petDemo.until > Date.now() && petDemo.toy) ret
 function petEvent(state, ms, food){
   const dur = ms || 4500;
   petEvt = {state, until: Date.now() + dur, dur, food};
-  if (state === "eat") setTimeout(() => requestLine("eat", true), 700);
+  /* the eating line comes with the chat answer ({"pet":…}, see chatRules); till then, one of the day's lines */
+  if (state === "eat") setLine(localLine(petStatsNow || petStats(), "eat"));
 }
 
 /* ---------- lines written by the AI ---------- */
@@ -124,7 +126,7 @@ let lineAt = 0, lineBusy = false, lineKey = "";
 function setLine(t, loading){
   $("#petSayText").textContent = t;
   $("#petSay").classList.toggle("loading", !!loading);
-  if (!loading) try { localStorage.setItem("petLine", JSON.stringify({t, d: todayKey()})); } catch (e) {}
+  if (!loading) try { localStorage.setItem("petLine", JSON.stringify({t, d: todayKey(), at: Date.now()})); } catch (e) {}
 }
 /* how the pet takes being poked again and again: set at hatching, so the AI knows how to react */
 const TOUCH = {
@@ -192,8 +194,8 @@ function localLine(s, st){
       sick: "Мур… Мне нехорошо. Давай полегче?", play: "Играю! Мне сегодня хорошо.", idle: s.left > 0 ? "Пур… Ещё можно перекусить." : "Мур. На сегодня хватит еды."}
   }[stage] || {};
   const R = baby ? {tickle: "Иии! Сикотна! Хи-хи-ку!", angry: "Фыл! Не тыкай! Бзз!", shy: "Ой… агу… стисняюсь…", happy: "Мур-р… есё, есё!"}
-    : stage === "young" ? {tickle: "Ха-ха! Щекотно, хватит, ку!", angry: "Фыр! Не тыкай меня.", shy: "Ой… ну ты чего… смусаюсь."}
-    : {tickle: "Ха-ха! Щекотно, хватит!", angry: "Фр! Перестань тыкать.", shy: "Ой… ну ты чего… смущаюсь."};
+    : stage === "young" ? {tickle: "Ха-ха! Щекотно, хватит, ку!", angry: "Фыр! Не тыкай меня.", shy: "Ой… ну ты чего… смусаюсь.", happy: "Мур! Ещё погладь, ку."}
+    : {tickle: "Ха-ха! Щекотно, хватит!", angry: "Фр! Перестань тыкать.", shy: "Ой… ну ты чего… смущаюсь.", happy: "Мур-р… Приятно."};
   const pk = linePack && linePack.stage === stage && linePack.name === pet.name && linePack.lines[st];
   if (pk && pk.length) return pk[Math.floor(Math.random() * pk.length)];
   return R[st] || L[st] || L.idle;
@@ -227,6 +229,17 @@ ${Object.entries(PACK_STATES).map(([k, v]) => `- ${k}: ${v}`).join("\n")}
       try { localStorage.setItem("petLinePack2", JSON.stringify(linePack)); } catch (e) {}
     }
   } catch (e) {} finally { packBusy = false; }
+}
+/* the chat model writes the pet's line about a meal in the same answer, so eating costs no extra request */
+function petChatRules(){
+  if (!pet) return "";
+  const stage = petStage(petAge());
+  return `\nВ приложении живёт зверёк-питомец ${pet.name} (${STAGE_RU[stage]}, характер: ${pet.trait || "добрый"}). Если ты записал еду (add_meal или edit_meal), перед строкой text добавь строку {"pet":"реплика зверька хозяину про эту еду"}. Как говорит зверёк: ${SPEECH[stage].rule} Не длиннее ${SPEECH[stage].max} символов, без цифр и без слов про диету (норма, калории, белок).`;
+}
+function petChatLine(t){
+  if (!pet) return;
+  const stage = petStage(petAge()), line = petSpeak(t, stage, SPEECH[stage].max);
+  if (line){ setLine(line); lineAt = Date.now(); }
 }
 async function requestLine(reason, force){
   if (!pet || !sample || lineBusy || !petStatsNow) return;
@@ -350,12 +363,15 @@ function petOnRender(){
     let recent = false; for (let i = 0; i <= 3; i++) if (isLogged(shift(todayKey(), -i))) recent = true;
     if (recent) hatchPet();
   }
-  /* a new line when the state really changes */
-  const st = petState(s);
-  const key = [st, Math.round(s.health / 25), Math.round(s.food / 34), s.eaten > 0].join("|");
+  /* a new AI line only when the lasting state changes (short events don't count), and not more than once in 5 minutes;
+     on opening, a line said in the last 45 minutes is kept; in between, the day's AI-written lines are used */
+  const st = petState(s), key = petState(s, true);
   if (pet && key !== lineKey){
     const first = !lineKey; lineKey = key;
-    if (st !== "eat" && st !== "happy") requestLine(first ? "open" : "state", first || Date.now() - lineAt > 20000);
+    let saved = null; try { saved = JSON.parse(localStorage.getItem("petLine") || "null"); } catch (e) {}
+    const fresh = saved && saved.at && Date.now() - saved.at < 45 * 60000;
+    if (first ? !fresh : Date.now() - lineAt > 5 * 60000) requestLine(first ? "open" : "state", true);
+    else if (!first && !(petEvt && petEvt.until > Date.now())) setLine(localLine(s, key));
   }
   if (!pet) setLine(localLine(s, st));
   else refreshLinePack();

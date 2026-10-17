@@ -163,17 +163,17 @@ $("#petCv").parentElement.onclick = () => {
   const st = petStatsNow ? petState(petStatsNow) : "idle";
   if (st === "sleep" || st === "hibernate"){
     const now = Date.now();
-    if (now - lastPokeLine > 8000){ lastPokeLine = now; setLine(localLine(petStatsNow, st)); requestLine("wake", true); }
+    if (now - lastPokeLine > 8000){ lastPokeLine = now; setLine(localLine(petStatsNow, st)); }
     return;
   }
   /* a single tap is a pat; three or more quick taps get the pet's own reaction */
   const now = Date.now();
   pokes = pokes.filter(t => now - t < 2500); pokes.push(now); petPokes = pokes.length;
-  if (pokes.length < 3){ petEvent("happy", 1600); requestLine("tap", now - lineAt > 15000); return; }
+  /* taps and pokes take the day's AI-written lines, so they cost no request */
+  if (pokes.length < 3){ petEvent("happy", 1600); if (now - lastPokeLine > 8000){ lastPokeLine = now; setLine(localLine(petStatsNow, "happy")); } return; }
   const r = TOUCH[petTouch()];
   petEvent(r.state, 2600);
-  if (!lineBusy) setLine(localLine(petStatsNow, r.state));
-  if (now - lastPokeLine > 5000){ lastPokeLine = now; lineAt = 0; requestLine("poke", true); }
+  if (!lineBusy && now - lastPokeLine > 2500){ lastPokeLine = now; setLine(localLine(petStatsNow, r.state)); }
 };
 
 /* ---------- the animation loop: 6 frames a second, like old consoles ---------- */

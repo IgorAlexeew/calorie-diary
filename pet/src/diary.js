@@ -757,7 +757,7 @@ ${c.detail.length ? c.detail.map(x => "- " + x).join("\n") : "- пока нет"
 {"type":"weight","kg":99.4}
 {"type":"bedtime","time":"01:00"}
 {"type":"recipes","items":[{"title":"…","why":"почему подходит сейчас, до 12 слов","time":20,"ingredients":[{"name":"…","grams":150,"kcal":165,"p":35,"f":3,"c":0}],"steps":["…"],"search":"…"}]}
-Если действий нет, пиши только status и text. Каждый объект, даже большой рецепт, пиши целиком в одну строку, без переносов внутри. Числа целые, кроме веса.`;
+Если действий нет, пиши только status и text. Каждый объект, даже большой рецепт, пиши целиком в одну строку, без переносов внутри. Числа целые, кроме веса.${petChatRules()}`;
 }
 
 /* ---------- applying and undoing actions ---------- */
@@ -1061,7 +1061,7 @@ async function sendChat(text, voice){
       {role:"user", content: (text || "(только фото, без текста)") + (items.length ? `\n(приложено фото: ${items.length})` : "")}];
     const opts = {modelTier:"default", cache:false, signal: chatCtl.signal};
     if (prepared.length) opts.images = prepared.map(p => p.blob);
-    let buf = "", full = "", chain = Promise.resolve(), photoIds = null, firstStatus = true;
+    let buf = "", full = "", chain = Promise.resolve(), photoIds = null, firstStatus = true, petLineDone = false;
     const seen = new Set();
     const handle = line => {
       line = line.trim().replace(/^```(json)?/,"").replace(/```$/,"").trim();
@@ -1083,6 +1083,7 @@ async function sendChat(text, voice){
           liveResult(await applyActions(dk, [a], ids, text));
         });
       }
+      if (typeof o.pet === "string" && o.pet && !petLineDone){ petLineDone = true; chain = chain.then(() => petChatLine(o.pet)); }
       if (o.text != null){ finalText = str(o.text, 1200); chain = chain.then(() => { if (live){ live.timeline.forEach(x => { if (x.k === "s") x.done = true; }); live.textTarget = finalText; } }); }
     };
     await sample(input, {...opts, onText: ({text: whole, delta}) => {
