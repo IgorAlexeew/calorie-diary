@@ -190,7 +190,7 @@
     const grid = look.stage === "egg" ? egg(pet, f, look.crack || 0) : sprite(pet, look, f);
     /* where the pet stands: wanders a little when idle, chases the ball when playing */
     let ox = 8, bx = 0, byy = 0;
-    if (st === "idle") ox += Math.round(5 * Math.sin(f / 45));
+    if (st === "idle" && look.stage !== "egg") ox += Math.round(5 * Math.sin(f / 45));
     if (st === "play" && look.toy !== "dance"){
       const t = f % 48, k = t < 24 ? t / 24 : (48 - t) / 24;
       bx = Math.round(6 + k * 34); byy = Math.round(31 - Math.abs(Math.sin(t / 48 * Math.PI * 4)) * 12);

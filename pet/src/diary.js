@@ -185,7 +185,7 @@ function renderWChart(pts, goal){
   const x=v=>l+(W-l-r)*(v-t0)/(t1-t0), y=v=>t+(H-t-b)*(1-(v-lo)/(hi-lo));
   const svg=document.createElementNS(ns,"svg"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`); svg.setAttribute("role","img"); svg.setAttribute("aria-label","График веса");
   const mk=(n,a,txt)=>{const e=document.createElementNS(ns,n);for(const[k,v]of Object.entries(a))e.setAttribute(k,v);if(txt!=null)e.textContent=txt;svg.append(e);return e;};
-  const fnt={"font-size":11,fill:"var(--muted)","font-family":"Onest, sans-serif"};
+  const fnt={"font-size":11,fill:"var(--muted)","font-family":"Handjet, sans-serif"};
   for (const v of [lo, Math.round((lo+hi)/2), hi]){ mk("line",{x1:l,x2:W-r,y1:y(v),y2:y(v),stroke:"var(--line)"}); mk("text",{x:l-6,y:y(v)+4,"text-anchor":"end",...fnt},v); }
   if (goal>=lo && goal<=hi){ mk("line",{x1:l,x2:W-r,y1:y(goal),y2:y(goal),stroke:"var(--ok)","stroke-dasharray":"4 4"}); mk("text",{x:W-r,y:y(goal)-5,"text-anchor":"end",...fnt},"цель "+goal); }
   mk("polyline",{points:pts.map(p=>`${x(p.t)},${y(p.w)}`).join(" "),fill:"none",stroke:"var(--accent)","stroke-width":2,"stroke-linejoin":"round"});
@@ -455,15 +455,15 @@ function renderWeek(){
     if (v > 0){
       const inside = bh >= 24;
       const t = mk("text",{x: x + w/2, y: inside ? y(v) + 16 : y(v) - 5, "text-anchor":"middle", "font-size": inside ? 12 : 11, "font-weight": inside ? 700 : 400,
-        fill: inside ? "#fff" : "var(--muted)", "font-family":"Onest, sans-serif"});      t.textContent = v;
+        fill: inside ? "#fff" : "var(--muted)", "font-family":"Handjet, sans-serif"});      t.textContent = v;
     }
     const [yy,mm,dd] = k.split("-").map(Number);
     const wd = new Date(yy,mm-1,dd).toLocaleDateString("ru-RU",{weekday:"short"});
-    mk("text",{x: x + w/2, y: H - 9, "text-anchor":"middle", "font-size":12, fill: k === cur ? "var(--fg)" : "var(--muted)", "font-weight": k === cur ? 600 : 400, "font-family":"Onest, sans-serif"}).textContent = wd;
+    mk("text",{x: x + w/2, y: H - 9, "text-anchor":"middle", "font-size":12, fill: k === cur ? "var(--fg)" : "var(--muted)", "font-weight": k === cur ? 600 : 400, "font-family":"Handjet, sans-serif"}).textContent = wd;
   });
   mk("line",{x1:left, x2:W-right, y1:y(g), y2:y(g), stroke:"var(--fg)", "stroke-width":1, "stroke-dasharray":"4 4", opacity:.5});
-  mk("text",{x:W-right+8, y:y(g)-3, "text-anchor":"start", "font-size":11, fill:"var(--muted)", "font-family":"Onest, sans-serif"}).textContent = "норма";
-  mk("text",{x:W-right+8, y:y(g)+11, "text-anchor":"start", "font-size":11, "font-weight":600, fill:"var(--muted)", "font-family":"Onest, sans-serif"}).textContent = g;
+  mk("text",{x:W-right+8, y:y(g)-3, "text-anchor":"start", "font-size":11, fill:"var(--muted)", "font-family":"Handjet, sans-serif"}).textContent = "норма";
+  mk("text",{x:W-right+8, y:y(g)+11, "text-anchor":"start", "font-size":11, "font-weight":600, fill:"var(--muted)", "font-family":"Handjet, sans-serif"}).textContent = g;
   $("#week").replaceChildren(svg);
 }
 

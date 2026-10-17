@@ -12,7 +12,7 @@ page = (head
   + '<title>Пиксельный дневник</title>\n'
   + '<meta name="claude:viewport-fit-sides" content="cover">\n'
   + '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
-  + '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Tiny5&display=swap">\n'
+  + '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Handjet:wght@400;500;600;700&display=swap">\n'
   + '<style>\n' + src("base.css") + src("pet.css") + '</style>\n'
   + src("body.html")
   + '<script>\n' + "\n".join(src(n) for n in ["icons.js", "engine.js", "pet.js", "diary.js", "tail.js"]) + '</script>\n'

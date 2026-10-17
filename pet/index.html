@@ -2,7 +2,7 @@
 <title>Пиксельный дневник</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Tiny5&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Handjet:wght@400;500;600;700&display=swap">
 <style>
 /* Layout: one narrow column, the day's balance on top, then input, the log, the week and the weight. */
 :root{
@@ -247,13 +247,13 @@ button.turnHead .chev{display:inline-flex;transition:transform .2s ease}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 .ring circle{transition:stroke-dashoffset .4s ease}
 /* 8-bit layer over the diary styles: hard borders, hard shadows, square corners.
-   Pixel font only for headings, labels and numbers; body text stays in Onest so it reads easily. */
+   One pixel face everywhere (Handjet), size-adjusted so small text stays readable. */
 :root{
   --bg:#ECEFE8; --surface:#FFFFFF; --line:#1B1F24; --fg:#1B1F24; --muted:#535C56;
   --accent:#3B5BDB; --accent-soft:#DDE4FB; --ok:#2F8F5B; --over:#D2364A; --track:#D3DACF; --warn:#B87A12;
   --s-health:#E0475B; --s-shape:#D9961F; --s-muscle:#2F8F5B; --s-mood:#3E8FD8; --s-food:#8A63D2;
-  --display:"Tiny5","Courier New",monospace;
-  --body:"Onest",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --display:"Handjet","Courier New",monospace;
+  --body:"Handjet","Courier New",monospace;
   --shadow:3px 3px 0 var(--line);
   --chev:none;
 }
@@ -270,12 +270,14 @@ button.turnHead .chev{display:inline-flex;transition:transform .2s ease}
 
 *,*::before,*::after{border-radius:0!important}
 html,body{height:100%}
-body{padding:0;margin:0;overflow:hidden;background:var(--bg);color:var(--fg);font:15px/1.5 var(--body)}
+body{padding:0;margin:0;overflow:hidden;background:var(--bg);color:var(--fg);font:500 15px/1.45 var(--body);font-size-adjust:.56}
+button,input,select,textarea{font-family:var(--body);font-size-adjust:.56}
+b,strong,.entrytext,.actTitle,.recipeTitle{font-weight:700}
 .px{border:3px solid var(--line);box-shadow:var(--shadow);background:var(--surface)}
 svg.pxi{display:block;flex-shrink:0;shape-rendering:crispEdges}
-h1,h2,h3{font-family:var(--display);font-weight:400;letter-spacing:.02em}
-h2{font-size:20px;text-transform:none;letter-spacing:.04em;color:var(--fg)}
-h3{font-size:20px;margin:6px 0 0}
+h1,h2,h3{font-family:var(--display);font-weight:700;letter-spacing:.02em}
+h2{font-size:17px;text-transform:none;letter-spacing:.04em;color:var(--fg)}
+h3{font-size:16px;margin:6px 0 0}
 
 /* screens and the transition between them */
 .app{position:fixed;inset:0;overflow:hidden}
@@ -298,18 +300,18 @@ h3{font-size:20px;margin:6px 0 0}
 /* pet screen */
 .petTop{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .petId{display:flex;flex-direction:column;min-width:0}
-.petId b{font:400 30px/1.1 var(--display);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.petId span{font:400 20px var(--display);color:var(--muted)}
+.petId b{font:700 26px/1.1 var(--display);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.petId span{font:600 16px var(--display);color:var(--muted)}
 .topBtns{display:flex;gap:10px;align-items:center}
-.streak{display:inline-flex;align-items:center;gap:4px;font:400 20px var(--display);color:var(--over)}
-.goal{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;font:400 20px var(--display);color:var(--muted)}
+.streak{display:inline-flex;align-items:center;gap:4px;font:600 16px var(--display);color:var(--over)}
+.goal{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;font:600 16px var(--display);color:var(--muted)}
 .say{position:relative;border:3px solid var(--line);background:var(--surface);padding:10px 12px;font-size:16px;line-height:1.45;min-height:3.4em;display:flex;align-items:center}
 .say::after{content:"";position:absolute;left:34px;bottom:-12px;width:12px;height:9px;background:var(--line);clip-path:polygon(0 0,100% 0,0 100%)}
 .say.loading #petSayText{color:var(--muted)}
 .scene{position:relative;padding:0;overflow:hidden;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .scene canvas{display:block;width:100%;height:auto;image-rendering:pixelated;image-rendering:crisp-edges}
-.sceneTag{position:absolute;left:8px;top:8px;font:400 20px var(--display);background:var(--line);color:var(--bg);padding:2px 6px}
-.stats{display:grid;grid-template-columns:20px auto 1fr 30px;gap:8px 8px;align-items:center;font:400 20px var(--display)}
+.sceneTag{position:absolute;left:8px;top:8px;font:600 16px var(--display);background:var(--line);color:var(--bg);padding:2px 6px}
+.stats{display:grid;grid-template-columns:18px auto 1fr 30px;gap:8px 8px;align-items:center;font:600 16px var(--display)}
 .stats .ico{color:var(--c)}
 .stats .val{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
 .seg{display:grid;grid-template-columns:repeat(var(--n,10),1fr);gap:2px;height:14px}
@@ -319,31 +321,31 @@ h3{font-size:20px;margin:6px 0 0}
 .goalSeg{--n:20;height:10px;--c:var(--ok)}
 .day{padding:12px;display:flex;flex-direction:column;gap:10px}
 .dayHead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;font-family:var(--display)}
-.dayHead b{font-size:30px;font-weight:400}
-.dayHead #ofTarget{color:var(--muted);font-size:20px}
-.day .left{font-size:20px;font-family:var(--display);font-weight:400}
+.dayHead b{font-size:26px;font-weight:700}
+.dayHead #ofTarget{color:var(--muted);font-size:15px}
+.day .left{font-size:16px;font-family:var(--display);font-weight:700}
 .kcalSeg{--n:20;height:16px}
 .sumPace{margin-top:0}
-.macro{grid-template-columns:96px 1fr auto;font-size:14px}
-.macro span:first-child{font-family:var(--display);font-size:20px;color:var(--fg)}
+.macro{grid-template-columns:80px 1fr auto;font-size:14px}
+.macro span:first-child{font-family:var(--display);font-weight:600;font-size:15px;color:var(--fg)}
 .bar{height:12px;border-radius:0;background:repeating-linear-gradient(90deg,var(--track) 0 8px,transparent 8px 10px);overflow:hidden}
 .bar i{border-radius:0;-webkit-mask:repeating-linear-gradient(90deg,#000 0 8px,transparent 8px 10px);mask:repeating-linear-gradient(90deg,#000 0 8px,transparent 8px 10px)}
 
 /* diary screen */
 .diaryTop{display:grid;grid-template-columns:auto 1fr;gap:10px 12px;align-items:center}
-.diaryTop h1{font-size:30px}
+.diaryTop h1{font-size:24px}
 .diaryTop .datenav{grid-column:1 / -1;width:100%}
-.datenav #dateLabel{flex:1;font-family:var(--display);font-size:20px;font-weight:400}
+.datenav #dateLabel{flex:1;font-family:var(--display);font-size:16px;font-weight:400}
 .datenav button{display:inline-grid;place-items:center;width:44px;height:40px;border:3px solid var(--line);background:var(--surface);color:var(--fg);box-shadow:var(--shadow)}
-.dTotal{margin:0;font:400 20px var(--display);color:var(--muted)}
+.dTotal{margin:0;font:600 16px var(--display);color:var(--muted)}
 .panel{border:3px solid var(--line);box-shadow:var(--shadow);padding:14px}
 .two{grid-template-columns:1fr}
 .pxInput,.field input{flex:1;min-width:0;border:2px solid var(--line);background:var(--bg);padding:9px 10px;color:var(--fg)}
-.small{border:3px solid var(--line);background:var(--accent-soft);box-shadow:var(--shadow);font-family:var(--display);font-weight:400;font-size:20px;color:var(--fg)}
+.small{border:3px solid var(--line);background:var(--accent-soft);box-shadow:var(--shadow);font-family:var(--display);font-weight:600;font-size:16px;color:var(--fg)}
 .small.danger{background:var(--over);color:#fff}
-.paceBig{font-family:var(--display);font-weight:400;font-size:30px}
+.paceBig{font-family:var(--display);font-weight:700;font-size:22px}
 .entry{border:2px solid var(--track)}
-.mealhead{font-family:var(--display);font-weight:400;font-size:20px}
+.mealhead{font-family:var(--display);font-weight:600;font-size:16px}
 select{background-image:none;border:2px solid var(--line);padding-right:12px}
 
 /* chat sheet */
@@ -385,10 +387,11 @@ select{background-image:none;border:2px solid var(--line);padding-right:12px}
 .modalHead{display:flex;justify-content:space-between;align-items:center}
 .modalHead .pxBtn{width:36px;height:36px}
 .pmInfo{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px}
-.pmInfo dt{font-family:var(--display);font-size:20px;color:var(--muted)}
+.pmInfo dt{font-family:var(--display);font-size:16px;color:var(--muted)}
 .pmInfo dd{margin:0}
 .pmDemo{display:flex;flex-wrap:wrap;gap:8px}
-.pmDemo button{font:400 20px var(--display);border:2px solid var(--line);background:var(--surface);color:var(--fg);box-shadow:2px 2px 0 var(--line);padding:6px 10px}
+.pmDemo button{font:600 16px var(--display);border:2px solid var(--line);background:var(--surface);color:var(--fg);box-shadow:2px 2px 0 var(--line);padding:6px 10px}
+svg text{font-size-adjust:none}
 </style>
 <div class="app" id="app">
   <div class="screens" id="screens" data-screen="pet">
@@ -765,7 +768,7 @@ function pxEl(name, size, cls){ const s = document.createElement("span"); s.styl
     const grid = look.stage === "egg" ? egg(pet, f, look.crack || 0) : sprite(pet, look, f);
     /* where the pet stands: wanders a little when idle, chases the ball when playing */
     let ox = 8, bx = 0, byy = 0;
-    if (st === "idle") ox += Math.round(5 * Math.sin(f / 45));
+    if (st === "idle" && look.stage !== "egg") ox += Math.round(5 * Math.sin(f / 45));
     if (st === "play" && look.toy !== "dance"){
       const t = f % 48, k = t < 24 ? t / 24 : (48 - t) / 24;
       bx = Math.round(6 + k * 34); byy = Math.round(31 - Math.abs(Math.sin(t / 48 * Math.PI * 4)) * 12);
@@ -1246,7 +1249,7 @@ function renderWChart(pts, goal){
   const x=v=>l+(W-l-r)*(v-t0)/(t1-t0), y=v=>t+(H-t-b)*(1-(v-lo)/(hi-lo));
   const svg=document.createElementNS(ns,"svg"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`); svg.setAttribute("role","img"); svg.setAttribute("aria-label","График веса");
   const mk=(n,a,txt)=>{const e=document.createElementNS(ns,n);for(const[k,v]of Object.entries(a))e.setAttribute(k,v);if(txt!=null)e.textContent=txt;svg.append(e);return e;};
-  const fnt={"font-size":11,fill:"var(--muted)","font-family":"Onest, sans-serif"};
+  const fnt={"font-size":11,fill:"var(--muted)","font-family":"Handjet, sans-serif"};
   for (const v of [lo, Math.round((lo+hi)/2), hi]){ mk("line",{x1:l,x2:W-r,y1:y(v),y2:y(v),stroke:"var(--line)"}); mk("text",{x:l-6,y:y(v)+4,"text-anchor":"end",...fnt},v); }
   if (goal>=lo && goal<=hi){ mk("line",{x1:l,x2:W-r,y1:y(goal),y2:y(goal),stroke:"var(--ok)","stroke-dasharray":"4 4"}); mk("text",{x:W-r,y:y(goal)-5,"text-anchor":"end",...fnt},"цель "+goal); }
   mk("polyline",{points:pts.map(p=>`${x(p.t)},${y(p.w)}`).join(" "),fill:"none",stroke:"var(--accent)","stroke-width":2,"stroke-linejoin":"round"});
@@ -1516,15 +1519,15 @@ function renderWeek(){
     if (v > 0){
       const inside = bh >= 24;
       const t = mk("text",{x: x + w/2, y: inside ? y(v) + 16 : y(v) - 5, "text-anchor":"middle", "font-size": inside ? 12 : 11, "font-weight": inside ? 700 : 400,
-        fill: inside ? "#fff" : "var(--muted)", "font-family":"Onest, sans-serif"});      t.textContent = v;
+        fill: inside ? "#fff" : "var(--muted)", "font-family":"Handjet, sans-serif"});      t.textContent = v;
     }
     const [yy,mm,dd] = k.split("-").map(Number);
     const wd = new Date(yy,mm-1,dd).toLocaleDateString("ru-RU",{weekday:"short"});
-    mk("text",{x: x + w/2, y: H - 9, "text-anchor":"middle", "font-size":12, fill: k === cur ? "var(--fg)" : "var(--muted)", "font-weight": k === cur ? 600 : 400, "font-family":"Onest, sans-serif"}).textContent = wd;
+    mk("text",{x: x + w/2, y: H - 9, "text-anchor":"middle", "font-size":12, fill: k === cur ? "var(--fg)" : "var(--muted)", "font-weight": k === cur ? 600 : 400, "font-family":"Handjet, sans-serif"}).textContent = wd;
   });
   mk("line",{x1:left, x2:W-right, y1:y(g), y2:y(g), stroke:"var(--fg)", "stroke-width":1, "stroke-dasharray":"4 4", opacity:.5});
-  mk("text",{x:W-right+8, y:y(g)-3, "text-anchor":"start", "font-size":11, fill:"var(--muted)", "font-family":"Onest, sans-serif"}).textContent = "норма";
-  mk("text",{x:W-right+8, y:y(g)+11, "text-anchor":"start", "font-size":11, "font-weight":600, fill:"var(--muted)", "font-family":"Onest, sans-serif"}).textContent = g;
+  mk("text",{x:W-right+8, y:y(g)-3, "text-anchor":"start", "font-size":11, fill:"var(--muted)", "font-family":"Handjet, sans-serif"}).textContent = "норма";
+  mk("text",{x:W-right+8, y:y(g)+11, "text-anchor":"start", "font-size":11, "font-weight":600, fill:"var(--muted)", "font-family":"Handjet, sans-serif"}).textContent = g;
   $("#week").replaceChildren(svg);
 }
 
