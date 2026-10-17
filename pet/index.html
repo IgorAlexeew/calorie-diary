@@ -283,9 +283,17 @@ h3{font-size:16px;margin:6px 0 0}
 
 /* screens and the transition between them */
 .app{position:fixed;inset:0;overflow:hidden}
-.screens{position:absolute;inset:0;display:flex;width:200%;transition:transform .42s steps(7,end)}
-.screens[data-screen="diary"]{transform:translateX(-50%)}
-@media (prefers-reduced-motion: reduce){.screens{transition:none}}
+.screens{position:absolute;inset:0;display:flex}
+/* the diary is a modal over everything, chat included, on the same column as the HUD */
+.screens .petScreen{width:100%}
+.screens .diaryScreen{display:none;position:fixed;inset:0;z-index:25;width:auto;background:rgba(8,10,14,.55);
+  padding:calc(12px + env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.screens[data-screen="diary"] .diaryScreen{display:block}
+.diaryBox{max-width:520px;margin:0 auto;background:var(--bg);border:3px solid var(--line);box-shadow:var(--shadow);padding:12px;display:flex;flex-direction:column;gap:12px;
+  animation:diaryIn .3s steps(5,end)}
+.diaryBox > *{flex-shrink:0}
+@keyframes diaryIn{from{transform:translateY(40px);opacity:0}}
+@media (prefers-reduced-motion: reduce){.diaryBox{animation:none}}
 .screen{width:50%;height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
   padding:calc(14px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(96px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
   display:flex;flex-direction:column;gap:14px}
@@ -440,6 +448,12 @@ svg text{font-size-adjust:.5!important}
 
 .chipWait{font-size:14px}
 .hudPanel[hidden]{display:none!important}
+/* the id line: every piece on one 26px row, centred on the same axis */
+.idLine{align-items:center}
+.idLine > *:not(.topBtns){display:inline-flex;align-items:center;height:26px;line-height:26px}
+.idLine b{line-height:26px}
+.idLine .sceneTag{height:24px;padding:0 6px}
+.idLine .streak{gap:3px}
 </style>
 <div class="app" id="app">
   <div class="screens" id="screens" data-screen="pet">
@@ -502,7 +516,8 @@ svg text{font-size-adjust:.5!important}
     </main>
 
     <!-- screen 2: the diary -->
-    <main class="screen diaryScreen" id="diaryScreen" aria-label="Дневник" inert>
+    <main class="screen diaryScreen" id="diaryScreen" aria-label="Дневник" role="dialog" aria-modal="true" inert>
+      <div class="diaryBox" id="diaryBox">
       <header class="diaryTop">
         <button type="button" class="pxBtn back" id="toPet" aria-label="К питомцу"></button>
         <h1>Дневник</h1>
@@ -551,6 +566,7 @@ svg text{font-size-adjust:.5!important}
           <label class="field">Цель по весу, кг<input id="tGoal" type="number" min="40" max="200" step="1"></label>
           <p class="hint">Жиры и углеводы считаются от калорий: ~30% и остаток.</p>
         </section>
+      </div>
       </div>
     </main>
   </div>
@@ -1222,18 +1238,24 @@ function setLine(t, loading){
   $("#petSay").classList.toggle("loading", !!loading);
   if (!loading) try { localStorage.setItem("petLine", JSON.stringify({t, d: todayKey()})); } catch (e) {}
 }
+/* how the pet talks: a baby babbles, a young one gets most words right, an adult speaks plainly with a little accent */
+const SPEECH = {
+  baby: {max: 32, rule: "Ты совсем малыш и только учишься говорить: 2–4 слова, путаешь порядок слов и формы («есть хочую», «ты не ням-ням», «много сладкое плохо»), говоришь о себе по имени или «моя», вставляешь звуки (пур-пур, ням, хрум, мяк, уи). Никаких цифр и длинных слов."},
+  young: {max: 50, rule: "Ты подросток и говоришь уже почти правильно: короткая фраза до 6 слов, иногда путаешь порядок или окончание, можно один звук (пур, ням, хрум). Можно одну простую цифру."},
+  adult: {max: 80, rule: "Ты взрослый и говоришь понятно: одна фраза до 10 слов, с лёгким звериным акцентом или звуком в начале. Можно одну конкретную деталь дня с цифрой."}
+};
 function localLine(s, st){
   if (!pet) return hatching ? "Тук-тук… Кто-то вылупляется!" : "Запиши первую еду в чат, и я вылуплюсь.";
-  switch (st){
-    case "hibernate": return "Хр-р… Запиши еду, и я проснусь.";
-    case "sleep": return "Хр-р… До завтра.";
-    case "eat": return "Хрум-хрум! Спасибо!";
-    case "hungry": return "Где моя еда? Я голоден.";
-    case "sad": return `Перебор на ${-s.left} ккал. Живот тяжёлый…`;
-    case "sick": return "Мне нехорошо. Давай поедим по норме?";
-    case "play": return "Играю! Мне сегодня хорошо.";
-    default: return s.left > 0 ? `До нормы ещё ${s.left} ккал.` : "На сегодня хватит еды.";
-  }
+  const stage = petStage(petAge());
+  const L = {
+    baby: {hibernate: "Хр-р… моя спать долго…", sleep: "Хр-р… пур-пур…", eat: "Ням-ням! Вкусно моя!", hungry: "Пур-пур, есть хочую!", sad: "Ой. Много ням. Живот бух.",
+      sick: "Моя плохо… ой-ой.", play: "Уи! Играть! Хорошо моя!", idle: s.left > 0 ? "Ням ещё можно. Пур?" : "Хватит ням. Пур-пур."},
+    young: {hibernate: "Хр-р… Еду запиши, я проснусь.", sleep: "Хр-р… До завтра, пур.", eat: "Хрум-хрум! Спасибо вкусно!", hungry: "Ням где? Голодный я.", sad: `Перебор ${-s.left} ккал. Тяжело живот.`,
+      sick: "Плохо мне. Норму давай?", play: "Играю! Хорошо сегодня!", idle: s.left > 0 ? `Ещё ${s.left} ккал можно, ням.` : "Хватит еды сегодня, пур."},
+    adult: {hibernate: "Хр-р… Запиши еду, и я проснусь.", sleep: "Хр-р… До завтра.", eat: "Хрум-хрум! Спасибо!", hungry: "Пур… Где моя еда? Я голоден.", sad: `Перебор на ${-s.left} ккал. Живот тяжёлый…`,
+      sick: "Мне нехорошо. Давай поедим по норме?", play: "Играю! Мне сегодня хорошо.", idle: s.left > 0 ? `До нормы ещё ${s.left} ккал.` : "На сегодня хватит еды."}
+  }[stage] || {};
+  return L[st] || L.idle;
 }
 async function requestLine(reason, force){
   if (!pet || !sample || lineBusy || !petStatsNow) return;
@@ -1247,11 +1269,12 @@ async function requestLine(reason, force){
 Шкалы от 0 до 100: здоровье ${s.health}, форма ${s.shape}, мышцы ${s.muscle}, настроение ${s.mood}, сытость ${s.food}.
 Сегодня хозяин съел ${s.eaten} из ${s.target} ккал, белок ${s.p} из ${s.gp} г${s.lastTitle ? `, последняя еда — «${s.lastTitle}» ${fmtH(s.sinceH)} назад` : ", еды сегодня ещё не было"}. Дней подряд с записями: ${s.streak}.
 Повод для реплики: ${why}.
-Напиши одну реплику питомца хозяину от первого лица, по-русски, не длиннее 90 символов. Живо, с характером, по-доброму, с одной конкретной деталью из дня (сколько осталось, чего не хватает, что было вкусно). Без эмодзи, кавычек и хэштегов. Ответь только репликой.`;
+Как ты говоришь: ${SPEECH[stage].rule}
+Напиши одну реплику питомца хозяину, по-русски, не длиннее ${SPEECH[stage].max} символов. Живо, с характером, по-доброму, по поводу и по тому, что важно сейчас (голоден, перебор, мало белка, вкусно). Без эмодзи, кавычек и хэштегов. Ответь только репликой.`;
   setLine($("#petSayText").textContent, true);
   try {
     const r = await sample(prompt, {modelTier:"quick", cache:false});
-    const t = str(r && r.text, 160).replace(/^["«„]+|["»“]+$/g, "").split("\n")[0].trim();
+    const t = str(r && r.text, SPEECH[stage].max + 30).replace(/^["«„]+|["»“]+$/g, "").split("\n")[0].trim();
     setLine(t || localLine(s, st));
   } catch (e) {
     setLine(localLine(s, st));
@@ -1265,7 +1288,7 @@ async function genPetAI(parts){
   const prompt = `Ты придумываешь характер 8-битному питомцу из игры-дневника питания. Детали уже выпали случайно:
 тело ${parts.body}, уши или макушка ${parts.ears}, глаза ${parts.eyes}, рот ${parts.mouth}, хвост ${parts.tail}, узор ${parts.pattern}, цвет ${parts.palette}.
 Придумай имя, которое подходит к этому облику, характер и первую фразу. Случайное число для разнообразия: ${Math.floor(Math.random() * 1e6)}.
-Ответь только JSON: {"name":"короткое русское имя, одно слово до 10 букв, можно съедобное","trait":"характер, 3–6 слов","greeting":"первая фраза хозяину, до 80 символов"}`;
+Ответь только JSON: {"name":"короткое русское имя, одно слово до 10 букв, можно съедобное","trait":"характер, 3–6 слов","greeting":"первая фраза хозяину, как говорит только что вылупившийся малыш: 2–4 слова, ломаная речь, звук вроде пур-пур или уи"}`;
   const r = await sample.json(prompt, {modelTier:"quick", cache:false});
   return r && typeof r === "object" ? cleanPet({...parts, name: r.name, trait: r.trait, greeting: r.greeting}) : null;
 }
@@ -1295,7 +1318,7 @@ async function hatchPet(){
   pet = {...p, born, gen, created: new Date().toISOString()};
   hatching = null;
   petEvent("happy", 3000);
-  setLine(p.greeting || `Привет! Я ${p.name}. Покормишь?`);
+  setLine(p.greeting || `Уи! ${p.name} моя. Ням дашь?`);
   lineAt = Date.now();
   petOnRender();
   enqueue(() => db.collection("pet").doc("current").set(pet));
@@ -2590,7 +2613,8 @@ function showScreen(name){
   const sc = $("#screens"); sc.dataset.screen = name;
   $("#petScreen").inert = name !== "pet"; $("#diaryScreen").inert = name !== "diary";
   if (name === "pet" && cur !== todayKey()){ cur = todayKey(); render(); renderChat(); }
-  (name === "pet" ? $("#petScreen") : $("#diaryScreen")).scrollTop = 0;
+  $("#diaryScreen").scrollTop = 0;
+  if (name === "diary") $("#toPet").focus();
 }
 $("#toDiary").innerHTML = pxIcon("book", 20);
 $("#toPet").innerHTML = pxIcon("back", 18);
@@ -2599,6 +2623,9 @@ $("#prev").innerHTML = pxIcon("chevL", 14);
 $("#next").innerHTML = pxIcon("chevR", 14);
 $("#toDiary").onclick = () => showScreen("diary");
 $("#toPet").onclick = () => showScreen("pet");
+/* the diary modal closes on its back button, a tap outside it, or Escape */
+$("#diaryScreen").addEventListener("click", e => { if (e.target === e.currentTarget) showScreen("pet"); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && $("#screens").dataset.screen === "diary") showScreen("pet"); });
 
 /* ---------- chat sheet ---------- */
 $("#chatIco").innerHTML = pxIcon("chat", 18);

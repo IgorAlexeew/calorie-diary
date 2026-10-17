@@ -59,7 +59,8 @@
     </main>
 
     <!-- screen 2: the diary -->
-    <main class="screen diaryScreen" id="diaryScreen" aria-label="Дневник" inert>
+    <main class="screen diaryScreen" id="diaryScreen" aria-label="Дневник" role="dialog" aria-modal="true" inert>
+      <div class="diaryBox" id="diaryBox">
       <header class="diaryTop">
         <button type="button" class="pxBtn back" id="toPet" aria-label="К питомцу"></button>
         <h1>Дневник</h1>
@@ -108,6 +109,7 @@
           <label class="field">Цель по весу, кг<input id="tGoal" type="number" min="40" max="200" step="1"></label>
           <p class="hint">Жиры и углеводы считаются от калорий: ~30% и остаток.</p>
         </section>
+      </div>
       </div>
     </main>
   </div>

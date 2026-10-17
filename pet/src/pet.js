@@ -126,18 +126,24 @@ function setLine(t, loading){
   $("#petSay").classList.toggle("loading", !!loading);
   if (!loading) try { localStorage.setItem("petLine", JSON.stringify({t, d: todayKey()})); } catch (e) {}
 }
+/* how the pet talks: a baby babbles, a young one gets most words right, an adult speaks plainly with a little accent */
+const SPEECH = {
+  baby: {max: 32, rule: "Ты совсем малыш и только учишься говорить: 2–4 слова, путаешь порядок слов и формы («есть хочую», «ты не ням-ням», «много сладкое плохо»), говоришь о себе по имени или «моя», вставляешь звуки (пур-пур, ням, хрум, мяк, уи). Никаких цифр и длинных слов."},
+  young: {max: 50, rule: "Ты подросток и говоришь уже почти правильно: короткая фраза до 6 слов, иногда путаешь порядок или окончание, можно один звук (пур, ням, хрум). Можно одну простую цифру."},
+  adult: {max: 80, rule: "Ты взрослый и говоришь понятно: одна фраза до 10 слов, с лёгким звериным акцентом или звуком в начале. Можно одну конкретную деталь дня с цифрой."}
+};
 function localLine(s, st){
   if (!pet) return hatching ? "Тук-тук… Кто-то вылупляется!" : "Запиши первую еду в чат, и я вылуплюсь.";
-  switch (st){
-    case "hibernate": return "Хр-р… Запиши еду, и я проснусь.";
-    case "sleep": return "Хр-р… До завтра.";
-    case "eat": return "Хрум-хрум! Спасибо!";
-    case "hungry": return "Где моя еда? Я голоден.";
-    case "sad": return `Перебор на ${-s.left} ккал. Живот тяжёлый…`;
-    case "sick": return "Мне нехорошо. Давай поедим по норме?";
-    case "play": return "Играю! Мне сегодня хорошо.";
-    default: return s.left > 0 ? `До нормы ещё ${s.left} ккал.` : "На сегодня хватит еды.";
-  }
+  const stage = petStage(petAge());
+  const L = {
+    baby: {hibernate: "Хр-р… моя спать долго…", sleep: "Хр-р… пур-пур…", eat: "Ням-ням! Вкусно моя!", hungry: "Пур-пур, есть хочую!", sad: "Ой. Много ням. Живот бух.",
+      sick: "Моя плохо… ой-ой.", play: "Уи! Играть! Хорошо моя!", idle: s.left > 0 ? "Ням ещё можно. Пур?" : "Хватит ням. Пур-пур."},
+    young: {hibernate: "Хр-р… Еду запиши, я проснусь.", sleep: "Хр-р… До завтра, пур.", eat: "Хрум-хрум! Спасибо вкусно!", hungry: "Ням где? Голодный я.", sad: `Перебор ${-s.left} ккал. Тяжело живот.`,
+      sick: "Плохо мне. Норму давай?", play: "Играю! Хорошо сегодня!", idle: s.left > 0 ? `Ещё ${s.left} ккал можно, ням.` : "Хватит еды сегодня, пур."},
+    adult: {hibernate: "Хр-р… Запиши еду, и я проснусь.", sleep: "Хр-р… До завтра.", eat: "Хрум-хрум! Спасибо!", hungry: "Пур… Где моя еда? Я голоден.", sad: `Перебор на ${-s.left} ккал. Живот тяжёлый…`,
+      sick: "Мне нехорошо. Давай поедим по норме?", play: "Играю! Мне сегодня хорошо.", idle: s.left > 0 ? `До нормы ещё ${s.left} ккал.` : "На сегодня хватит еды."}
+  }[stage] || {};
+  return L[st] || L.idle;
 }
 async function requestLine(reason, force){
   if (!pet || !sample || lineBusy || !petStatsNow) return;
@@ -151,11 +157,12 @@ async function requestLine(reason, force){
 Шкалы от 0 до 100: здоровье ${s.health}, форма ${s.shape}, мышцы ${s.muscle}, настроение ${s.mood}, сытость ${s.food}.
 Сегодня хозяин съел ${s.eaten} из ${s.target} ккал, белок ${s.p} из ${s.gp} г${s.lastTitle ? `, последняя еда — «${s.lastTitle}» ${fmtH(s.sinceH)} назад` : ", еды сегодня ещё не было"}. Дней подряд с записями: ${s.streak}.
 Повод для реплики: ${why}.
-Напиши одну реплику питомца хозяину от первого лица, по-русски, не длиннее 90 символов. Живо, с характером, по-доброму, с одной конкретной деталью из дня (сколько осталось, чего не хватает, что было вкусно). Без эмодзи, кавычек и хэштегов. Ответь только репликой.`;
+Как ты говоришь: ${SPEECH[stage].rule}
+Напиши одну реплику питомца хозяину, по-русски, не длиннее ${SPEECH[stage].max} символов. Живо, с характером, по-доброму, по поводу и по тому, что важно сейчас (голоден, перебор, мало белка, вкусно). Без эмодзи, кавычек и хэштегов. Ответь только репликой.`;
   setLine($("#petSayText").textContent, true);
   try {
     const r = await sample(prompt, {modelTier:"quick", cache:false});
-    const t = str(r && r.text, 160).replace(/^["«„]+|["»“]+$/g, "").split("\n")[0].trim();
+    const t = str(r && r.text, SPEECH[stage].max + 30).replace(/^["«„]+|["»“]+$/g, "").split("\n")[0].trim();
     setLine(t || localLine(s, st));
   } catch (e) {
     setLine(localLine(s, st));
@@ -169,7 +176,7 @@ async function genPetAI(parts){
   const prompt = `Ты придумываешь характер 8-битному питомцу из игры-дневника питания. Детали уже выпали случайно:
 тело ${parts.body}, уши или макушка ${parts.ears}, глаза ${parts.eyes}, рот ${parts.mouth}, хвост ${parts.tail}, узор ${parts.pattern}, цвет ${parts.palette}.
 Придумай имя, которое подходит к этому облику, характер и первую фразу. Случайное число для разнообразия: ${Math.floor(Math.random() * 1e6)}.
-Ответь только JSON: {"name":"короткое русское имя, одно слово до 10 букв, можно съедобное","trait":"характер, 3–6 слов","greeting":"первая фраза хозяину, до 80 символов"}`;
+Ответь только JSON: {"name":"короткое русское имя, одно слово до 10 букв, можно съедобное","trait":"характер, 3–6 слов","greeting":"первая фраза хозяину, как говорит только что вылупившийся малыш: 2–4 слова, ломаная речь, звук вроде пур-пур или уи"}`;
   const r = await sample.json(prompt, {modelTier:"quick", cache:false});
   return r && typeof r === "object" ? cleanPet({...parts, name: r.name, trait: r.trait, greeting: r.greeting}) : null;
 }
@@ -199,7 +206,7 @@ async function hatchPet(){
   pet = {...p, born, gen, created: new Date().toISOString()};
   hatching = null;
   petEvent("happy", 3000);
-  setLine(p.greeting || `Привет! Я ${p.name}. Покормишь?`);
+  setLine(p.greeting || `Уи! ${p.name} моя. Ням дашь?`);
   lineAt = Date.now();
   petOnRender();
   enqueue(() => db.collection("pet").doc("current").set(pet));

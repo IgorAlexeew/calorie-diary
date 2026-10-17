@@ -11,7 +11,8 @@ function showScreen(name){
   const sc = $("#screens"); sc.dataset.screen = name;
   $("#petScreen").inert = name !== "pet"; $("#diaryScreen").inert = name !== "diary";
   if (name === "pet" && cur !== todayKey()){ cur = todayKey(); render(); renderChat(); }
-  (name === "pet" ? $("#petScreen") : $("#diaryScreen")).scrollTop = 0;
+  $("#diaryScreen").scrollTop = 0;
+  if (name === "diary") $("#toPet").focus();
 }
 $("#toDiary").innerHTML = pxIcon("book", 20);
 $("#toPet").innerHTML = pxIcon("back", 18);
@@ -20,6 +21,9 @@ $("#prev").innerHTML = pxIcon("chevL", 14);
 $("#next").innerHTML = pxIcon("chevR", 14);
 $("#toDiary").onclick = () => showScreen("diary");
 $("#toPet").onclick = () => showScreen("pet");
+/* the diary modal closes on its back button, a tap outside it, or Escape */
+$("#diaryScreen").addEventListener("click", e => { if (e.target === e.currentTarget) showScreen("pet"); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && $("#screens").dataset.screen === "diary") showScreen("pet"); });
 
 /* ---------- chat sheet ---------- */
 $("#chatIco").innerHTML = pxIcon("chat", 18);

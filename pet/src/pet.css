@@ -35,9 +35,17 @@ h3{font-size:16px;margin:6px 0 0}
 
 /* screens and the transition between them */
 .app{position:fixed;inset:0;overflow:hidden}
-.screens{position:absolute;inset:0;display:flex;width:200%;transition:transform .42s steps(7,end)}
-.screens[data-screen="diary"]{transform:translateX(-50%)}
-@media (prefers-reduced-motion: reduce){.screens{transition:none}}
+.screens{position:absolute;inset:0;display:flex}
+/* the diary is a modal over everything, chat included, on the same column as the HUD */
+.screens .petScreen{width:100%}
+.screens .diaryScreen{display:none;position:fixed;inset:0;z-index:25;width:auto;background:rgba(8,10,14,.55);
+  padding:calc(12px + env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.screens[data-screen="diary"] .diaryScreen{display:block}
+.diaryBox{max-width:520px;margin:0 auto;background:var(--bg);border:3px solid var(--line);box-shadow:var(--shadow);padding:12px;display:flex;flex-direction:column;gap:12px;
+  animation:diaryIn .3s steps(5,end)}
+.diaryBox > *{flex-shrink:0}
+@keyframes diaryIn{from{transform:translateY(40px);opacity:0}}
+@media (prefers-reduced-motion: reduce){.diaryBox{animation:none}}
 .screen{width:50%;height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
   padding:calc(14px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(96px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
   display:flex;flex-direction:column;gap:14px}
@@ -192,3 +200,9 @@ svg text{font-size-adjust:.5!important}
 
 .chipWait{font-size:14px}
 .hudPanel[hidden]{display:none!important}
+/* the id line: every piece on one 26px row, centred on the same axis */
+.idLine{align-items:center}
+.idLine > *:not(.topBtns){display:inline-flex;align-items:center;height:26px;line-height:26px}
+.idLine b{line-height:26px}
+.idLine .sceneTag{height:24px;padding:0 6px}
+.idLine .streak{gap:3px}
