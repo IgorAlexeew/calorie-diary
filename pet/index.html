@@ -306,7 +306,6 @@ h3{font-size:16px;margin:6px 0 0}
 .petId span{font:600 16px var(--display);color:var(--muted)}
 .topBtns{display:flex;gap:10px;align-items:center}
 .streak{display:inline-flex;align-items:center;gap:4px;font:600 16px var(--display);color:var(--over)}
-.goal{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;font:600 16px var(--display);color:var(--muted)}
 .say{position:relative;border:3px solid var(--line);background:var(--surface);padding:10px 12px;font-size:16px;line-height:1.45;min-height:3.4em;display:flex;align-items:center}
 .say::after{content:"";position:absolute;left:34px;bottom:-12px;width:12px;height:9px;background:var(--line);clip-path:polygon(0 0,100% 0,0 100%)}
 .say.loading #petSayText{color:var(--muted)}
@@ -315,18 +314,41 @@ h3{font-size:16px;margin:6px 0 0}
 .petScreen > .world,.petScreen > .hud{position:absolute;inset:0;max-width:none;width:auto;margin:0}
 .world{overflow:hidden;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .world canvas{display:block;image-rendering:pixelated;image-rendering:crisp-edges}
-.hud{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:12px;pointer-events:none;
+.hud{overflow:hidden;display:flex;flex-direction:column;gap:12px;pointer-events:none;
   padding:calc(14px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(96px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
 .hud > *{width:100%;max-width:520px;margin-inline:auto;flex-shrink:0;pointer-events:auto}
 .hud > .petSpace{flex:1 0 230px;pointer-events:none}
-.petTop .petId{flex:1 1 auto}
-.petId{background:var(--surface);border:3px solid var(--line);box-shadow:var(--shadow);padding:4px 10px}
-.streak{background:var(--surface);border:3px solid var(--line);box-shadow:var(--shadow);padding:6px 8px}
-.goal{background:var(--surface);border:3px solid var(--line);box-shadow:var(--shadow);padding:6px 10px}
-.stats.px{padding:10px 12px}
-.stageLine{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
-.petId .sceneTag{background:var(--line);color:var(--bg);padding:0 6px}
-.stats{display:grid;grid-template-columns:18px auto 1fr 30px;gap:8px 8px;align-items:center;font:600 16px var(--display)}
+/* HUD panels: one neutral see-through dark glass in every theme, so they sit on day and night alike */
+.hud{--fg:#F2F4EF;--muted:#B8C0BA;--track:rgba(255,255,255,.16);--surface:rgba(14,16,22,.6);--line:rgba(14,16,22,.88);--ok:#5CC48A;--over:#FF6B7D;--warn:#E5B04A;
+  --s-health:#FF6B7D;--s-shape:#F0B640;--s-muscle:#5CC48A;--s-mood:#6CB4F5;--s-food:#B293F5;--shadow:none;color:var(--fg)}
+.hudCard{background:var(--surface);border:3px solid var(--line);padding:10px 12px}
+.topCard{position:relative;display:flex;flex-direction:column;gap:6px}
+.idLine{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font:600 16px var(--display);color:var(--muted)}
+.idLine b{font:700 24px/1 var(--display);color:var(--fg)}
+.idLine .sceneTag{background:var(--fg);color:#111;padding:0 6px}
+.topBtns{position:absolute;top:8px;right:8px;display:flex;gap:6px}
+.idLine{margin-right:88px;min-height:38px}
+.topBtns .pxBtn{width:38px;height:38px;border-width:2px;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.35)}
+.idLine .streak{color:var(--over)}
+.hud .say{margin:0;border:0;background:none;padding:0;min-height:1.4em;font-size:17px;line-height:1.4}
+.hud .say::after{display:none}
+.hud .day{display:flex;flex-direction:column;gap:10px}
+.hud .sumPace{display:none}
+.hudBottom{position:relative}
+.hudPanel{position:absolute;left:0;right:0;bottom:calc(100% + 8px)}
+.hudToggles{display:flex;justify-content:space-between;gap:10px}
+.hudTgl{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:6px 12px;border:3px solid var(--line);background:var(--surface);color:var(--fg);font:600 16px var(--display)}
+.hudTgl[aria-expanded="true"]{background:var(--fg);color:#111}
+.hudTgl .ico{display:inline-flex;color:var(--c,currentColor)}
+.macros{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.macro{display:grid;grid-template-columns:1fr;gap:2px;font-size:15px;white-space:nowrap;min-width:0}
+.macro .bar{grid-column:1 / -1}
+.macro span:last-of-type{color:var(--muted);font-size:14px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;font:600 15px var(--display)}
+.st{display:grid;grid-template-columns:16px 1fr auto;gap:4px 6px;align-items:center}
+.st .seg{grid-column:1 / -1;height:10px}
+.goal{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;font:600 15px var(--display);color:var(--muted)}
+
 .stats .ico{color:var(--c)}
 .stats .val{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
 .seg{display:grid;grid-template-columns:repeat(var(--n,10),1fr);gap:2px;height:14px}
@@ -341,7 +363,6 @@ h3{font-size:16px;margin:6px 0 0}
 .day .left{font-size:16px;font-family:var(--display);font-weight:700}
 .kcalSeg{--n:20;height:16px}
 .sumPace{margin-top:0}
-.macro{grid-template-columns:80px 1fr auto;font-size:14px}
 .macro span:first-child{font-family:var(--display);font-weight:600;font-size:15px;color:var(--fg)}
 .bar{height:12px;border-radius:0;background:repeating-linear-gradient(90deg,var(--track) 0 8px,transparent 8px 10px);overflow:hidden}
 .bar i{border-radius:0;-webkit-mask:repeating-linear-gradient(90deg,#000 0 8px,transparent 8px 10px);mask:repeating-linear-gradient(90deg,#000 0 8px,transparent 8px 10px)}
@@ -410,6 +431,7 @@ select{background-image:none;border:2px solid var(--line);padding-right:12px}
 svg text{font-size-adjust:.5!important}
 
 .chipWait{font-size:14px}
+.hudPanel[hidden]{display:none!important}
 </style>
 <div class="app" id="app">
   <div class="screens" id="screens" data-screen="pet">
@@ -420,41 +442,51 @@ svg text{font-size-adjust:.5!important}
         <canvas id="petCv" width="192" height="160" aria-label="Питомец, нажми, чтобы погладить"></canvas>
       </div>
       <div class="hud" id="hud">
-      <header class="petTop">
-        <div class="petId">
+      <!-- top of the HUD: one block with who the pet is, what it says and the two buttons -->
+      <header class="hudCard topCard">
+        <div class="idLine">
           <b id="petName">Яйцо</b>
-          <span class="stageLine"><span id="petStage">ждёт первой записи</span><span class="sceneTag" id="sceneTag" hidden></span></span>
-        </div>
-        <div class="topBtns">
+          <span id="petStage">ждёт первой записи</span>
+          <span class="sceneTag" id="sceneTag" hidden></span>
           <span class="streak num" id="streak" hidden></span>
-          <button type="button" class="pxBtn" id="toDiary" aria-label="Дневник"></button>
-          <button type="button" class="pxBtn" id="petMenuBtn" aria-label="Меню питомца"></button>
+          <span class="topBtns">
+            <button type="button" class="pxBtn" id="toDiary" aria-label="Дневник"></button>
+            <button type="button" class="pxBtn" id="petMenuBtn" aria-label="Меню питомца"></button>
+          </span>
         </div>
+        <p class="say" id="petSay" aria-live="polite"><span id="petSayText">…</span></p>
       </header>
-
-      <div class="goal" id="goalLine" hidden>
-        <span class="goalLab" id="goalLab"></span>
-        <div class="seg goalSeg" id="goalSeg" aria-hidden="true"></div>
-      </div>
-
-      <div class="say" id="petSay" aria-live="polite"><span id="petSayText">…</span></div>
 
       <div class="petSpace" id="petSpace" aria-hidden="true"></div>
 
-      <div class="stats px" id="petStats"></div>
-
-      <section class="day px" aria-label="Итог дня">
-        <div class="dayHead">
-          <span><b class="num" id="eaten">0</b> <span class="num" id="ofTarget">из 1800 ккал</span></span>
-          <span class="left num" id="left">Осталось 1800 ккал</span>
+      <!-- bottom of the HUD: two folded panels, opened by the buttons above the chat -->
+      <div class="hudBottom">
+        <section class="hudCard day hudPanel" id="foodPanel" aria-label="Итог дня" hidden>
+          <div class="dayHead">
+            <span><b class="num" id="eaten">0</b> <span class="num" id="ofTarget">из 1800 ккал</span></span>
+            <span class="left num" id="left">Осталось 1800 ккал</span>
+          </div>
+          <div class="seg kcalSeg" id="kcalSeg" aria-hidden="true"></div>
+          <div class="sumPace num" id="sumPace" hidden></div>
+          <div class="sumPace num" id="stepsLine" hidden></div>
+          <div class="macros">
+            <div class="macro"><span>Белки</span><span class="num" id="pVal">0 / 140 г</span><div class="bar"><i id="pBar" style="width:0"></i></div></div>
+            <div class="macro"><span>Жиры</span><span class="num" id="fVal">0 / 60 г</span><div class="bar"><i id="fBar" style="width:0"></i></div></div>
+            <div class="macro"><span>Углеводы</span><span class="num" id="cVal">0 / 175 г</span><div class="bar"><i id="cBar" style="width:0"></i></div></div>
+          </div>
+        </section>
+        <section class="hudCard hudPanel" id="statsPanel" aria-label="Состояние питомца" hidden>
+          <div class="stats" id="petStats"></div>
+          <div class="goal" id="goalLine" hidden>
+            <span class="goalLab" id="goalLab"></span>
+            <div class="seg goalSeg" id="goalSeg" aria-hidden="true"></div>
+          </div>
+        </section>
+        <div class="hudToggles">
+          <button type="button" class="hudTgl" id="tglFood" aria-controls="foodPanel" aria-expanded="false"><span class="ico" id="tglFoodIco"></span><span class="num" id="tglFoodLab">Еда</span></button>
+          <button type="button" class="hudTgl" id="tglStats" aria-controls="statsPanel" aria-expanded="false"><span class="num" id="tglStatsLab">Состояние</span><span class="ico" id="tglStatsIco"></span></button>
         </div>
-        <div class="seg kcalSeg" id="kcalSeg" aria-hidden="true"></div>
-        <div class="sumPace num" id="sumPace">Темп появится после взвешиваний</div>
-        <div class="sumPace num" id="stepsLine" hidden></div>
-        <div class="macro"><span>Белки</span><div class="bar"><i id="pBar" style="width:0"></i></div><span class="num" id="pVal">0 / 140 г</span></div>
-        <div class="macro"><span>Жиры</span><div class="bar"><i id="fBar" style="width:0"></i></div><span class="num" id="fVal">0 / 60 г</span></div>
-        <div class="macro"><span>Углеводы</span><div class="bar"><i id="cBar" style="width:0"></i></div><span class="num" id="cVal">0 / 175 г</span></div>
-      </section>
+      </div>
       <div id="notice" class="notice" hidden></div>
       </div>
     </main>
@@ -1260,9 +1292,14 @@ function petOnRender(){
   if (!box.children.length) for (const d of STAT_DEFS){
     const ic = el("span",{class:"ico"}); ic.innerHTML = pxIcon(d.icon, 16); ic.style.setProperty("--c", d.c);
     const seg = el("div",{class:"seg", id:"st-" + d.k}); seg.style.setProperty("--c", d.c);
-    box.append(ic, el("span",{text: d.label}), seg, el("span",{class:"val num", id:"sv-" + d.k}));
+    box.append(el("div",{class:"st"}, ic, el("span",{text: d.label}), el("span",{class:"val num", id:"sv-" + d.k}), seg));
   }
   for (const d of STAT_DEFS){ segs($("#st-" + d.k), 10, Math.round(s[d.k] / 10), 0); $("#sv-" + d.k).textContent = s[d.k]; $("#st-" + d.k).setAttribute("aria-label", `${d.label}: ${s[d.k]} из 100`); }
+  /* the two fold buttons say the essentials while folded */
+  $("#tglFoodLab").textContent = `${s.eaten} / ${s.target} ккал`;
+  const low = STAT_DEFS.reduce((a, d) => s[d.k] < s[a.k] ? d : a, STAT_DEFS[0]);
+  $("#tglStatsLab").textContent = `${low.label} ${s[low.k]}`;
+  const si = $("#tglStatsIco"); si.innerHTML = pxIcon(low.icon, 16); si.style.setProperty("--c", low.c);
   /* header */
   const age = petAge(), stage = petStage(age), br = petBranch(s, stage), xp = petXp();
   $("#petName").textContent = pet ? pet.name : hatching ? "Яйцо" : "Яйцо";
@@ -2635,6 +2672,17 @@ for (const [t, st, toy] of DEMO){
   b.onclick = () => { if (!pet) return; petDemo = {state: st, toy, until: Date.now() + 6000, dur: 6000, food: st === "eat" ? pick(Object.keys(PetEngine.FOOD)) : null}; setLine(localLine(petStatsNow, st)); closeMenu(); showScreen("pet"); };
   $("#pmDemo").append(b);
 }
+/* the folded HUD panels: one open at a time, remembered between visits */
+(() => {
+  const pairs = [["#tglFood", "#foodPanel"], ["#tglStats", "#statsPanel"]];
+  $("#tglFoodIco").innerHTML = pxIcon("apple", 16); $("#tglFoodIco").style.setProperty("--c", "var(--s-food)");
+  const open = id => {
+    for (const [b, p] of pairs){ const on = p === id && $(p).hidden; $(p).hidden = !on; $(b).setAttribute("aria-expanded", on); }
+    try { localStorage.setItem("petPanel", pairs.some(([, p]) => !$(p).hidden) ? id : ""); } catch (e) {}
+  };
+  pairs.forEach(([b, p]) => $(b).onclick = () => open(p));
+  try { const v = localStorage.getItem("petPanel"); if (v && pairs.some(([, p]) => p === v)) open(v); } catch (e) {}
+})();
 /* preview any age and branch; stays until "Как сейчас" */
 const AGES = [["Как сейчас", null], ["Малыш", {stage: "baby", branch: ""}], ["Юный", {stage: "young", branch: "balanced"}], ["Взрослый", {stage: "adult", branch: "balanced"}],
   ...["athlete", "donut", "slim", "lazy", "grump"].map(b => [BRANCH_RU[b][0], {stage: "adult", branch: b, fat: b === "donut" ? 85 : b === "slim" ? 20 : 50, muscle: b === "athlete" ? 80 : 40}])];
@@ -2676,7 +2724,9 @@ $("#petCv").parentElement.onclick = () => {
     if (wr.width && wr.height){
       const S = Math.max(2, Math.floor(Math.min(wr.width, 520) * dpr / 50)), W = Math.ceil(wr.width * dpr / S), H = Math.ceil(wr.height * dpr / S);
       if (cv.width !== W * S || cv.height !== H * S){ cv.width = W * S; cv.height = H * S; cv.style.width = W * S / dpr + "px"; cv.style.height = H * S / dpr + "px"; }
-      const sp = $("#petSpace").getBoundingClientRect(), ground = Math.max(32, Math.min(H - 2, Math.round((sp.bottom - wr.top) * dpr / S)));
+      /* the pet stands a little below the top block, never lower than the free space */
+      const sp = $("#petSpace").getBoundingClientRect(), toLog = y => Math.round((y - wr.top) * dpr / S);
+      const ground = Math.max(32, Math.min(H - 2, toLog(sp.bottom), toLog(sp.top) + 38));
       PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground});
     }
     const tag = look.stage === "egg" ? "" : (look.toy === "dance" && look.state === "play" ? "Танцует" : STATE_TAG[look.state] || "");

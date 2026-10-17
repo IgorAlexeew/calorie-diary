@@ -122,6 +122,17 @@ for (const [t, st, toy] of DEMO){
   b.onclick = () => { if (!pet) return; petDemo = {state: st, toy, until: Date.now() + 6000, dur: 6000, food: st === "eat" ? pick(Object.keys(PetEngine.FOOD)) : null}; setLine(localLine(petStatsNow, st)); closeMenu(); showScreen("pet"); };
   $("#pmDemo").append(b);
 }
+/* the folded HUD panels: one open at a time, remembered between visits */
+(() => {
+  const pairs = [["#tglFood", "#foodPanel"], ["#tglStats", "#statsPanel"]];
+  $("#tglFoodIco").innerHTML = pxIcon("apple", 16); $("#tglFoodIco").style.setProperty("--c", "var(--s-food)");
+  const open = id => {
+    for (const [b, p] of pairs){ const on = p === id && $(p).hidden; $(p).hidden = !on; $(b).setAttribute("aria-expanded", on); }
+    try { localStorage.setItem("petPanel", pairs.some(([, p]) => !$(p).hidden) ? id : ""); } catch (e) {}
+  };
+  pairs.forEach(([b, p]) => $(b).onclick = () => open(p));
+  try { const v = localStorage.getItem("petPanel"); if (v && pairs.some(([, p]) => p === v)) open(v); } catch (e) {}
+})();
 /* preview any age and branch; stays until "Как сейчас" */
 const AGES = [["Как сейчас", null], ["Малыш", {stage: "baby", branch: ""}], ["Юный", {stage: "young", branch: "balanced"}], ["Взрослый", {stage: "adult", branch: "balanced"}],
   ...["athlete", "donut", "slim", "lazy", "grump"].map(b => [BRANCH_RU[b][0], {stage: "adult", branch: b, fat: b === "donut" ? 85 : b === "slim" ? 20 : 50, muscle: b === "athlete" ? 80 : 40}])];
@@ -163,7 +174,9 @@ $("#petCv").parentElement.onclick = () => {
     if (wr.width && wr.height){
       const S = Math.max(2, Math.floor(Math.min(wr.width, 520) * dpr / 50)), W = Math.ceil(wr.width * dpr / S), H = Math.ceil(wr.height * dpr / S);
       if (cv.width !== W * S || cv.height !== H * S){ cv.width = W * S; cv.height = H * S; cv.style.width = W * S / dpr + "px"; cv.style.height = H * S / dpr + "px"; }
-      const sp = $("#petSpace").getBoundingClientRect(), ground = Math.max(32, Math.min(H - 2, Math.round((sp.bottom - wr.top) * dpr / S)));
+      /* the pet stands a little below the top block, never lower than the free space */
+      const sp = $("#petSpace").getBoundingClientRect(), toLog = y => Math.round((y - wr.top) * dpr / S);
+      const ground = Math.max(32, Math.min(H - 2, toLog(sp.bottom), toLog(sp.top) + 38));
       PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground});
     }
     const tag = look.stage === "egg" ? "" : (look.toy === "dance" && look.state === "play" ? "Танцует" : STATE_TAG[look.state] || "");

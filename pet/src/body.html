@@ -7,41 +7,51 @@
         <canvas id="petCv" width="192" height="160" aria-label="Питомец, нажми, чтобы погладить"></canvas>
       </div>
       <div class="hud" id="hud">
-      <header class="petTop">
-        <div class="petId">
+      <!-- top of the HUD: one block with who the pet is, what it says and the two buttons -->
+      <header class="hudCard topCard">
+        <div class="idLine">
           <b id="petName">Яйцо</b>
-          <span class="stageLine"><span id="petStage">ждёт первой записи</span><span class="sceneTag" id="sceneTag" hidden></span></span>
-        </div>
-        <div class="topBtns">
+          <span id="petStage">ждёт первой записи</span>
+          <span class="sceneTag" id="sceneTag" hidden></span>
           <span class="streak num" id="streak" hidden></span>
-          <button type="button" class="pxBtn" id="toDiary" aria-label="Дневник"></button>
-          <button type="button" class="pxBtn" id="petMenuBtn" aria-label="Меню питомца"></button>
+          <span class="topBtns">
+            <button type="button" class="pxBtn" id="toDiary" aria-label="Дневник"></button>
+            <button type="button" class="pxBtn" id="petMenuBtn" aria-label="Меню питомца"></button>
+          </span>
         </div>
+        <p class="say" id="petSay" aria-live="polite"><span id="petSayText">…</span></p>
       </header>
-
-      <div class="goal" id="goalLine" hidden>
-        <span class="goalLab" id="goalLab"></span>
-        <div class="seg goalSeg" id="goalSeg" aria-hidden="true"></div>
-      </div>
-
-      <div class="say" id="petSay" aria-live="polite"><span id="petSayText">…</span></div>
 
       <div class="petSpace" id="petSpace" aria-hidden="true"></div>
 
-      <div class="stats px" id="petStats"></div>
-
-      <section class="day px" aria-label="Итог дня">
-        <div class="dayHead">
-          <span><b class="num" id="eaten">0</b> <span class="num" id="ofTarget">из 1800 ккал</span></span>
-          <span class="left num" id="left">Осталось 1800 ккал</span>
+      <!-- bottom of the HUD: two folded panels, opened by the buttons above the chat -->
+      <div class="hudBottom">
+        <section class="hudCard day hudPanel" id="foodPanel" aria-label="Итог дня" hidden>
+          <div class="dayHead">
+            <span><b class="num" id="eaten">0</b> <span class="num" id="ofTarget">из 1800 ккал</span></span>
+            <span class="left num" id="left">Осталось 1800 ккал</span>
+          </div>
+          <div class="seg kcalSeg" id="kcalSeg" aria-hidden="true"></div>
+          <div class="sumPace num" id="sumPace" hidden></div>
+          <div class="sumPace num" id="stepsLine" hidden></div>
+          <div class="macros">
+            <div class="macro"><span>Белки</span><span class="num" id="pVal">0 / 140 г</span><div class="bar"><i id="pBar" style="width:0"></i></div></div>
+            <div class="macro"><span>Жиры</span><span class="num" id="fVal">0 / 60 г</span><div class="bar"><i id="fBar" style="width:0"></i></div></div>
+            <div class="macro"><span>Углеводы</span><span class="num" id="cVal">0 / 175 г</span><div class="bar"><i id="cBar" style="width:0"></i></div></div>
+          </div>
+        </section>
+        <section class="hudCard hudPanel" id="statsPanel" aria-label="Состояние питомца" hidden>
+          <div class="stats" id="petStats"></div>
+          <div class="goal" id="goalLine" hidden>
+            <span class="goalLab" id="goalLab"></span>
+            <div class="seg goalSeg" id="goalSeg" aria-hidden="true"></div>
+          </div>
+        </section>
+        <div class="hudToggles">
+          <button type="button" class="hudTgl" id="tglFood" aria-controls="foodPanel" aria-expanded="false"><span class="ico" id="tglFoodIco"></span><span class="num" id="tglFoodLab">Еда</span></button>
+          <button type="button" class="hudTgl" id="tglStats" aria-controls="statsPanel" aria-expanded="false"><span class="num" id="tglStatsLab">Состояние</span><span class="ico" id="tglStatsIco"></span></button>
         </div>
-        <div class="seg kcalSeg" id="kcalSeg" aria-hidden="true"></div>
-        <div class="sumPace num" id="sumPace">Темп появится после взвешиваний</div>
-        <div class="sumPace num" id="stepsLine" hidden></div>
-        <div class="macro"><span>Белки</span><div class="bar"><i id="pBar" style="width:0"></i></div><span class="num" id="pVal">0 / 140 г</span></div>
-        <div class="macro"><span>Жиры</span><div class="bar"><i id="fBar" style="width:0"></i></div><span class="num" id="fVal">0 / 60 г</span></div>
-        <div class="macro"><span>Углеводы</span><div class="bar"><i id="cBar" style="width:0"></i></div><span class="num" id="cVal">0 / 175 г</span></div>
-      </section>
+      </div>
       <div id="notice" class="notice" hidden></div>
       </div>
     </main>

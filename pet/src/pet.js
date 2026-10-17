@@ -225,9 +225,14 @@ function petOnRender(){
   if (!box.children.length) for (const d of STAT_DEFS){
     const ic = el("span",{class:"ico"}); ic.innerHTML = pxIcon(d.icon, 16); ic.style.setProperty("--c", d.c);
     const seg = el("div",{class:"seg", id:"st-" + d.k}); seg.style.setProperty("--c", d.c);
-    box.append(ic, el("span",{text: d.label}), seg, el("span",{class:"val num", id:"sv-" + d.k}));
+    box.append(el("div",{class:"st"}, ic, el("span",{text: d.label}), el("span",{class:"val num", id:"sv-" + d.k}), seg));
   }
   for (const d of STAT_DEFS){ segs($("#st-" + d.k), 10, Math.round(s[d.k] / 10), 0); $("#sv-" + d.k).textContent = s[d.k]; $("#st-" + d.k).setAttribute("aria-label", `${d.label}: ${s[d.k]} из 100`); }
+  /* the two fold buttons say the essentials while folded */
+  $("#tglFoodLab").textContent = `${s.eaten} / ${s.target} ккал`;
+  const low = STAT_DEFS.reduce((a, d) => s[d.k] < s[a.k] ? d : a, STAT_DEFS[0]);
+  $("#tglStatsLab").textContent = `${low.label} ${s[low.k]}`;
+  const si = $("#tglStatsIco"); si.innerHTML = pxIcon(low.icon, 16); si.style.setProperty("--c", low.c);
   /* header */
   const age = petAge(), stage = petStage(age), br = petBranch(s, stage), xp = petXp();
   $("#petName").textContent = pet ? pet.name : hatching ? "Яйцо" : "Яйцо";
