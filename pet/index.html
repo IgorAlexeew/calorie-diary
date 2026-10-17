@@ -626,111 +626,208 @@ function pxEl(name, size, cls){ const s = document.createElement("span"); s.styl
     }
   }
 
-  /* look: {fat 0..100 (50 = in shape), muscle 0..100, branch, state, stage} */
+  /* ---------- the pet is assembled from parts ----------
+     The body is a silhouette; ears, tail, arms and feet are small pixel templates hooked to anchor points
+     found on the body's real outline, so every part stays attached whatever the body's shape and size.
+     Animation moves parts, not the picture: the body breathes, ears twitch, the tail wags, arms change pose,
+     feet step, eyes blink and change expression, the mouth chews.
+     Template letters: m main, l light, d dark, o outline, k eye ink, w white, p pink, r mouth red,
+     c horn cream, g leaf, G stem; "." is empty. Left-side parts are drawn and mirrored to the right. */
+  const T = {
+    ear: {
+      cat:     {px: 2, py: 3, rows: ["m...", "mm..", "mlm.", "mmmm"]},
+      bunny:   {px: 1, py: 6, rows: [".m.", "mlm", "mlm", "mlm", "mlm", "mmm", "mmm"]},
+      bear:    {px: 2, py: 2, rows: [".mm.", "mllm", "mmmm"]},
+      horns:   {px: 1, py: 2, rows: ["c.", "cc", ".c"]}
+    },
+    top: {
+      antenna: {px: 0, py: 4, rows: ["ll", "ll", "o.", "o.", "o."]},
+      sprout:  {px: 2, py: 3, rows: ["gg.gg", ".gGg.", "..G..", "..G.."]}
+    },
+    tail: {
+      curl:   {px: 0, py: 2, rows: ["..mm", ".m.m", "mm.."]},
+      fluff:  {px: 0, py: 2, rows: [".ll.", "mllm", "mmlm", ".mm."]},
+      spikes: {px: 0, py: 2, rows: ["..d", ".dm", "mmm"]}
+    },
+    arm: {
+      down:   {px: 0, py: 0, rows: ["m", "m", "m"]},
+      downS:  {px: 0, py: 0, rows: ["mm", "mm", "mm"]},
+      up:     {px: 0, py: 2, rows: [".m", "mm", "m."]},
+      upS:    {px: 0, py: 2, rows: [".mm", "mmm", "mm."]},
+      out:    {px: 0, py: 0, rows: ["mm", ".m"]},
+      outS:   {px: 0, py: 0, rows: ["mmm", ".mm"]}
+    },
+    foot: {px: 1, py: 0, rows: ["ddd"]},
+    eye: {
+      dot:    ["k", "k"],
+      big:    ["kw", "kk"],
+      bead:   ["wk", "kk"],
+      sleepy: ["dd", "kk"],
+      closed: ["..", "kk"],
+      joy:    [".k.", "k.k"],
+      x:      ["k.k", ".k.", "k.k"],
+      sad:    ["k..", ".kk"]
+    },
+    mouth: {
+      smile:  ["k..k", ".kk."],
+      cat:    ["k.kk.k", ".k..k."],
+      flat:   ["kk"],
+      fang:   ["k..k", ".kk.", ".w.."],
+      frown:  [".kk.", "k..k"],
+      open:   [".kk.", "krrk", ".kk."],
+      chew:   ["kkkk"]
+    }
+  };
+  const SOLID = "mldcgG";
   function sprite(pet, look, f){
-    const G = 32, px = Array.from({length: G}, () => Array(G).fill(null)), body = Array.from({length: G}, () => Array(G).fill(false));
+    const G = 32, MIR = x => G - 1 - x;
+    const px = Array.from({length: G}, () => Array(G).fill(null));
+    const solid = Array.from({length: G}, () => Array(G).fill(false));
     let [main, light, dark] = PALETTES[pet.palette] || PALETTES.mint;
-    const st = look.state || "idle", br = look.branch || "";
+    const st = look.state || "idle", br = look.branch || "", baby = look.stage === "baby";
     if (br === "grump"){ main = gray(main); light = gray(light); dark = gray(dark); }
     if (st === "sick"){ main = tint(main); light = tint(light); }
-    const set = (x, y, c) => { if (x >= 0 && y >= 0 && x < G && y < G) px[y][x] = c; };
-    const solid = (x, y, c) => { if (x >= 0 && y >= 0 && x < G && y < G){ px[y][x] = c; body[y][x] = true; } };
+    const COL = {m: main, l: light, d: dark, o: OUT, k: OUT, w: "#FFFFFF", p: "#F59AB0", r: "#B0303C", c: "#F2E8CF", g: "#6CC24A", G: "#3E8E3A"};
+    const put = (x, y, ch, isSolid) => { if (x < 0 || y < 0 || x >= G || y >= G || ch === ".") return; px[y][x] = COL[ch] || ch; if (isSolid) solid[y][x] = true; };
+    /* a template placed so that its pivot lands on (ax, ay); mirrored for the right side */
+    function stamp(t, ax, ay, mirror, front){
+      t.rows.forEach((row, j) => [...row].forEach((ch, i) => {
+        if (ch === ".") return;
+        const x = mirror ? ax + (t.px - i) : ax + (i - t.px), y = ay + (j - t.py);
+        if (!front && solid[y] && solid[y][x] && body[y][x]) return; /* parts behind the body stay behind */
+        put(x, y, ch, SOLID.includes(ch));
+      }));
+    }
+
+    /* motion of the whole pet and of the body alone */
     const fat = look.fat == null ? 50 : look.fat, mus = look.muscle == null ? 40 : look.muscle;
-    const baby = look.stage === "baby", sc = baby ? 0.85 : 1;
-    let rx = Math.round((8 + (fat - 50) / 50 * 3) * sc), ry = Math.round(8 * sc);
-    if (br === "slim") rx = Math.round(6 * sc);
-    if (br === "donut") rx = Math.round(11 * sc);
-    const cx = 16;
-    /* motion */
-    let yoff = 0, xoff = 0;
-    if (st === "happy") yoff = [0, -2, -3, -2, 0, 0][f % 6];
-    else if (st === "eat") yoff = 0;
-    else if (st === "sleep" || st === "hibernate") yoff = 0;
-    else if (st === "sick") xoff = [0, 0, 1, 1, 0, 0, -1, -1][f % 8];
-    else if (st === "play" && look.toy === "dance"){ xoff = [-1, -1, 0, 1, 1, 0][f % 6]; yoff = [0, -1, 0, 0, -1, 0][f % 6]; }
-    else if (st === "play") yoff = [0, -1, -2, -1, 0, 0][f % 6];
-    else yoff = (f >> 1) % 2;
-    if (st === "idle" && (f % 40) > 30) xoff = (f % 80) > 40 ? 1 : -1;
-    const squash = st === "sleep" || st === "hibernate" ? 1 : 0;
-    const cy = 22 - ry + 8 + yoff + squash, by = cy;
-    const cxx = cx + xoff;
-    /* ears behind the body */
-    const ty = by - ry + squash;
-    const ear = pet.ears;
-    if (ear === "cat") for (const s of [-1, 1]) for (let k = 0; k < 5; k++) for (let w = -Math.floor(k / 2); w <= Math.floor(k / 2); w++) solid(cxx + s * Math.round(rx * .55) + w, ty - 3 + k, k > 2 && w === 0 ? light : main);
-    if (ear === "bunny") for (const s of [-1, 1]) for (let k = 0; k < 7; k++) for (let w = 0; w < 3; w++) solid(cxx + s * 3 + w - 1, ty - 6 + k, w === 1 && k > 1 ? light : main);
-    if (ear === "bear") for (const s of [-1, 1]) for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) if (x * x + y * y <= 5) solid(cxx + s * Math.round(rx * .7) + x, ty + 1 + y, x * x + y * y <= 1 ? light : main);
-    if (ear === "horns") for (const s of [-1, 1]) for (let k = 0; k < 3; k++) solid(cxx + s * 4 + (k === 0 ? s : 0), ty - 2 + k, "#F2E8CF");
-    /* tail */
-    const tx = cxx + rx, tyy = by + 3;
-    if (pet.tail === "curl") [[0, 0], [1, 0], [2, -1], [2, -2], [1, -3]].forEach(([a, b]) => solid(tx + a, tyy + b, main));
-    if (pet.tail === "fluff") for (let y = -2; y <= 1; y++) for (let x = 0; x <= 3; x++) if (x * x + y * y <= 6) solid(tx + x, tyy + y, x > 1 ? light : main);
-    if (pet.tail === "spikes") for (let k = 0; k < 4; k++){ solid(tx + k, tyy + 1 - (k >> 1), main); if (k % 2) solid(tx + k, tyy - (k >> 1), dark); }
-    /* feet */
-    if (st !== "hibernate") for (const s of [-1, 1]) for (let w = 0; w < 3; w++) solid(cxx + s * Math.max(3, rx - 4) + w - 1, by + ry - (pet.body === "ghost" ? 1 : 0), dark);
-    /* body */
+    let jump = 0, sway = 0;
+    if (st === "happy") jump = [0, -2, -3, -2, 0, 0][f % 6];
+    if (st === "play" && look.toy !== "dance") jump = [0, -1, -2, -1, 0, 0][f % 6];
+    if (st === "play" && look.toy === "dance") sway = [-1, -1, 0, 1, 1, 0][f % 6];
+    if (st === "sick") sway = [0, 0, 1, 1, 0, 0, -1, -1][f % 8];
+    const breathe = (st === "idle" || st === "hungry" || st === "sad") ? (f >> 1) % 2 : st === "sleep" ? (f >> 2) % 2 : 0;
+
+    /* the body silhouette */
+    const sc = baby ? 0.8 : 1;
+    let rx = (7.5 + (fat - 50) / 50 * 3) * sc, ry = (baby ? 6 : 7.5);
+    if (br === "slim") rx = 5.5 * sc;
+    if (br === "donut") rx = 10.5 * sc;
+    const lying = st === "hibernate";
+    if (lying) ry -= 1;
+    const bottom = 28 + jump, cx = 16 + sway;
+    const cy = bottom - ry + 0.5 + breathe * 0.5;
+    const body = Array.from({length: G}, () => Array(G).fill(false));
     for (let y = 0; y < G; y++) for (let x = 0; x < G; x++){
-      const dx = (x + .5 - cxx) / rx, dy = (y + .5 - by) / (ry - squash * .5);
-      if (!inside(pet.body, dx, dy, x)) continue;
-      let c = main;
-      if (dx + dy > 1.05) c = dark;
-      if (pet.pattern === "belly" && ((dx / .55) ** 2 + ((dy - .45) / .45) ** 2 <= 1)) c = light;
-      if (pet.pattern === "spots" && hash(x >> 1, y >> 1) > .82 && dy < .6) c = dark;
-      if (pet.pattern === "stripes" && dy < -.1 && (y % 3 === 0)) c = dark;
-      solid(x, y, c);
+      const dx = (x + .5 - cx) / rx, dy = (y + .5 - cy) / ry;
+      if (y <= bottom && inside(pet.body, dx, dy, x)) body[y][x] = true;
     }
-    /* arms: bigger with muscle */
-    const armH = br === "athlete" ? 4 : mus > 65 ? 3 : 2, armW = br === "athlete" ? 3 : mus > 65 ? 2 : 1;
-    if (st !== "hibernate") for (const s of [-1, 1]) for (let h = 0; h < armH; h++) for (let w = 0; w < armW; w++) solid(cxx + s * (rx + w), by + 1 + h - (st === "happy" || (st === "play" && (look.toy !== "dance" || ((f % 6) < 3) === (s < 0))) ? 3 : 0), main);
-    /* antenna / sprout on top */
-    if (ear === "antenna"){ for (let k = 1; k <= 3; k++) set(cxx, ty - k, OUT); for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) solid(cxx + a - (a ? 0 : 0), ty - 5 + b, light); }
-    if (ear === "sprout"){ for (let k = 1; k <= 3; k++) set(cxx, ty - k, "#3E8E3A"); solid(cxx - 1, ty - 4, "#6CC24A"); solid(cxx - 2, ty - 4, "#6CC24A"); solid(cxx + 1, ty - 3, "#6CC24A"); solid(cxx + 2, ty - 4, "#6CC24A"); }
-    /* outline around everything solid */
-    const o = [];
-    for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) if (!body[y][x] && !px[y][x]){
-      if ((y > 0 && body[y - 1][x]) || (y < G - 1 && body[y + 1][x]) || (x > 0 && body[y][x - 1]) || (x < G - 1 && body[y][x + 1])) o.push([x, y]);
-    }
-    o.forEach(([x, y]) => set(x, y, OUT));
-    /* hibernation: tucked under a checked blanket up to the nose */
-    if (st === "hibernate") for (let y = by; y < G; y++) for (let x = 0; x < G; x++) if (body[y][x]) px[y][x] = y === by ? "#F2E8CF" : ((x >> 1) + (y >> 1)) % 2 ? "#4F63C9" : "#7387E6";
-    /* highlight */
-    if (st !== "hibernate"){ set(cxx - Math.round(rx * .5), by - Math.round(ry * .55), "#FFFFFF"); set(cxx - Math.round(rx * .5) + 1, by - Math.round(ry * .55), light); }
-    /* face */
-    const ey = by - 2 + (baby ? 1 : 0), ex = Math.max(3, Math.min(4, rx - 4));
-    const blink = (f % 30) === 0 || (f % 30) === 1;
-    let eyeMode = pet.eyes;
-    if (st === "sleep" || st === "hibernate" || blink) eyeMode = "closed";
-    if (st === "happy" || st === "play" || st === "eat" && (f % 4) > 1) eyeMode = "joy";
-    if (st === "sick") eyeMode = "x";
-    if (st === "sad") eyeMode = "sad";
-    if (br === "lazy" && eyeMode !== "closed" && eyeMode !== "joy") eyeMode = "sleepy";
-    for (const s of [-1, 1]){
-      const x = cxx + s * ex - (s > 0 ? 1 : 0);
-      switch (eyeMode){
-        case "closed": set(x, ey + 1, OUT); set(x + 1, ey + 1, OUT); break;
-        case "joy": set(x, ey + 1, OUT); set(x + 1, ey, OUT); set(x + 2, ey + 1, OUT); break;
-        case "x": set(x, ey, OUT); set(x + 2, ey, OUT); set(x + 1, ey + 1, OUT); set(x, ey + 2, OUT); set(x + 2, ey + 2, OUT); break;
-        case "sad": set(x, ey + 1, OUT); set(x + 1, ey + 1, OUT); set(x + 1, ey + 2, OUT); set(x + (s < 0 ? 0 : 1), ey - 1, OUT); break;
-        case "sleepy": set(x, ey + 1, OUT); set(x + 1, ey + 1, OUT); set(x, ey, dark); set(x + 1, ey, dark); break;
-        case "big": set(x, ey, OUT); set(x + 1, ey, "#FFFFFF"); set(x, ey + 1, OUT); set(x + 1, ey + 1, OUT); break;
-        case "bead": set(x, ey, OUT); set(x + 1, ey, OUT); set(x, ey + 1, OUT); set(x + 1, ey + 1, OUT); set(x, ey - 1, OUT); set(x + 1, ey - 1, OUT); set(x, ey, "#FFFFFF"); break;
-        default: set(x, ey, OUT); set(x, ey + 1, OUT);
+    const rowsOf = x => { const r = []; for (let y = 0; y < G; y++) if (body[y][x]) r.push(y); return r; };
+    const colsOf = y => { const c = []; for (let x = 0; x < G; x++) if (body[y] && body[y][x]) c.push(x); return c; };
+    const topAt = x => { const r = rowsOf(x); return r.length ? r[0] : null; };
+    const botAt = x => { const r = rowsOf(x); return r.length ? r[r.length - 1] : null; };
+    let top = G, bot = 0, left = G, right = 0;
+    for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) if (body[y][x]){ top = Math.min(top, y); bot = Math.max(bot, y); left = Math.min(left, x); right = Math.max(right, x); }
+    const cl = Math.floor(cx - .5), cr = MIR(cl) + (cx - 16) * 2; /* the two middle columns */
+    const H = bot - top + 1, Wd = right - left + 1;
+
+    /* behind the body: feet, tail, ears */
+    if (!lying){
+      const fx = Math.max(2, Math.round(Wd * 0.22));
+      for (const s of [-1, 1]){
+        const x = s < 0 ? cl - fx + 1 : cr + fx - 1;
+        const b = botAt(x) == null ? bot : botAt(x);
+        const step = look.moving && ((f >> 1) % 2 === (s < 0 ? 0 : 1)) ? -1 : 0;
+        stamp(T.foot, x, Math.min(29 + jump, b + 1) + step, s > 0, false);
       }
     }
-    if (!(st === "sleep" || st === "hibernate") && eyeMode !== "x" && eyeMode !== "sad") for (const s of [-1, 1]) set(cxx + s * (ex + 2) - (s > 0 ? 1 : 0), ey + 2, "#F59AB0");
-    const my = ey + (eyeMode === "x" || eyeMode === "sad" ? 4 : 3);
-    if (st === "eat"){ const open = (f % 4) < 2; set(cxx - 1, my, OUT); set(cxx, my, OUT); if (open){ set(cxx - 1, my + 1, "#B0303C"); set(cxx, my + 1, "#B0303C"); set(cxx - 2, my, OUT); set(cxx + 1, my, OUT); } }
-    else if (st === "sad" || st === "sick" || br === "grump"){ set(cxx - 2, my + 1, OUT); set(cxx - 1, my, OUT); set(cxx, my, OUT); set(cxx + 1, my + 1, OUT); }
-    else if (st === "hibernate"){ /* the mouth is under the blanket */ }
-    else if (st === "sleep" || pet.mouth === "flat"){ set(cxx - 1, my, OUT); set(cxx, my, OUT); }
-    else if (pet.mouth === "cat"){ set(cxx - 2, my, OUT); set(cxx - 1, my + 1, OUT); set(cxx, my, OUT); set(cxx + 1, my + 1, OUT); set(cxx + 2, my, OUT); }
-    else { set(cxx - 2, my, OUT); set(cxx - 1, my + 1, OUT); set(cxx, my + 1, OUT); set(cxx + 1, my, OUT); if (pet.mouth === "fang") set(cxx, my + 2, "#FFFFFF"); }
-    /* branch accessories */
-    if (br === "athlete") for (let x = cxx - rx + 1; x <= cxx + rx - 1; x++) if (body[ey - 2] && body[ey - 2][x]) set(x, ey - 2, "#E0475B");
-    if (br === "lazy" && st !== "happy" && st !== "hibernate"){ [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [1, -1], [2, -1], [3, -1], [2, -2], [3, -3], [4, -3]].forEach(([a, b]) => set(cxx - 2 + a, ty - 1 + b, b === 0 ? "#F2E8CF" : "#5B6CC2")); set(cxx + 5, ty - 3, "#FFFFFF"); }
-    if (br === "donut") [[-rx - 2, 6], [rx + 3, 5], [-rx - 1, 8]].forEach(([a, b]) => set(cxx + a, by + b - 2, "#C98B4B"));
-    if (br === "balanced" && (f % 12) < 6){ set(cxx - rx - 2, ty, "#F5C842"); set(cxx + rx + 2, ty + 3, "#F5C842"); set(cxx - rx - 2, ty - 1, "#FFFFFF"); }
-    if (st === "sick") for (let k = 0; k < 4; k++) set(cxx + 1 + k, my + 1 - (k >> 1), k === 3 ? "#E0475B" : "#DDE3EA");
+    if (T.tail[pet.tail]){
+      const ty = Math.round(cy + ry * 0.35), cols = colsOf(ty);
+      const wag = st === "happy" || st === "play" ? f % 2 : st === "idle" ? (f >> 2) % 2 : 0;
+      if (cols.length) stamp(T.tail[pet.tail], cols[cols.length - 1] + 1, ty - wag, false, false);
+    }
+    const earDef = T.ear[pet.ears];
+    if (earDef){
+      /* ears sit on the head's own width a few rows down, so narrow tops (pear, egg) keep them apart */
+      const tw = colsOf(top + 2).length || Wd;
+      const ex = Math.max(2, Math.round(tw * ({bunny: .3, horns: .28, cat: .42, bear: .45}[pet.ears] || .4)));
+      for (const s of [-1, 1]){
+        const x = s < 0 ? cl - ex + 1 : cr + ex - 1, t = topAt(x);
+        if (t == null) continue;
+        const twitch = (st === "idle" && s > 0 && f % 24 < 2) || (st === "happy" && f % 2) ? -1 : 0;
+        stamp(earDef, x, t + (pet.ears === "bear" || pet.ears === "horns" ? 0 : 1) + twitch + (st === "sad" || st === "sick" ? 1 : 0), s > 0, false);
+      }
+    }
+
+    /* the body: shading, pattern, highlight */
+    for (let y = 0; y < G; y++) for (let x = 0; x < G; x++){
+      if (!body[y][x]) continue;
+      const dx = (x + .5 - cx) / rx, dy = (y + .5 - cy) / ry;
+      let c = main;
+      if (dx + dy > 1.0) c = dark;
+      if (pet.pattern === "belly" && ((dx / .55) ** 2 + ((dy - .4) / .5) ** 2 <= 1)) c = light;
+      if (pet.pattern === "spots" && hash(x >> 1, y >> 1) > .82 && dy < .55 && dy > -.7) c = dark;
+      if (pet.pattern === "stripes" && dy < -.15 && dy > -.85 && (y - top) % 3 === 1) c = dark;
+      px[y][x] = c; solid[y][x] = true;
+    }
+    if (!lying){ put(cl - Math.round(Wd * .25), top + 2, "w"); put(cl - Math.round(Wd * .25) + 1, top + 2, "l"); }
+
+    /* arms, in front of the body */
+    const armY = Math.round(cy + ry * 0.15), cols = colsOf(armY), strong = br === "athlete" || mus > 65;
+    if (!lying && cols.length){
+      let poseL = "down", poseR = "down", dyL = 0, dyR = 0;
+      if (st === "happy" || (st === "play" && look.toy !== "dance") || st === "eat"){ poseL = poseR = "up"; }
+      else if (st === "play"){ const a = (f % 6) < 3; poseL = a ? "up" : "down"; poseR = a ? "down" : "up"; }
+      else if (st === "hungry"){ poseR = "out"; }
+      else if (st === "idle"){ if (f % 40 > 33){ poseR = "up"; } else { dyL = (f >> 2) % 2; dyR = 1 - dyL; } }
+      const k = n => T.arm[n + (strong ? "S" : "")];
+      stamp(k(poseL), cols[0] - 1, armY + dyL, true, true);
+      stamp(k(poseR), cols[cols.length - 1] + 1, armY + dyR, false, true);
+    }
+    /* things on top of the head */
+    if (T.top[pet.ears]){ const t = topAt(cl); if (t != null) stamp(T.top[pet.ears], cl, t - 1, false, true); }
+
+    /* one outline around everything solid */
+    const edge = [];
+    for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) if (!solid[y][x] && !px[y][x]){
+      if ((y > 0 && solid[y - 1][x]) || (y < G - 1 && solid[y + 1][x]) || (x > 0 && solid[y][x - 1]) || (x < G - 1 && solid[y][x + 1])) edge.push([x, y]);
+    }
+    edge.forEach(([x, y]) => put(x, y, "o"));
+
+    /* the face, placed from the body's own size */
+    const eyeY = top + Math.max(2, Math.round(H * (baby ? 0.42 : 0.36)));
+    const gap = Math.max(1, Math.round(Wd * (baby ? 0.12 : 0.1)));
+    const blink = (f % 30) === 0;
+    let eye = T.eye[pet.eyes] ? pet.eyes : "dot";
+    if (st === "sleep" || st === "hibernate" || blink) eye = "closed";
+    else if (st === "happy" || st === "play" || (st === "eat" && (f % 4) > 1)) eye = "joy";
+    else if (st === "sick") eye = "x";
+    else if (st === "sad") eye = "sad";
+    else if (br === "lazy") eye = "sleepy";
+    const er = T.eye[eye], ew = Math.max(...er.map(r => r.length));
+    er.forEach((row, j) => [...row].forEach((ch, i) => { if (ch === ".") return; put(cl - gap - ew + 1 + i, eyeY + j, ch); put(cr + gap + ew - 1 - i, eyeY + j, ch); }));
+    const eyeH = er.length;
+    if (!(st === "sleep" || st === "hibernate" || st === "sick" || st === "sad")){
+      const cy2 = eyeY + eyeH;
+      for (const [x, s] of [[cl - gap - ew - 1, -1], [cr + gap + ew + 1, 1]]) if (body[cy2] && body[cy2][x] && body[cy2][x - s]) { put(x, cy2, "p"); }
+    }
+    let mouth = T.mouth[pet.mouth] ? pet.mouth : "smile";
+    if (st === "eat") mouth = (f % 4) < 2 ? "open" : "chew";
+    else if (st === "sad" || st === "sick" || br === "grump") mouth = "frown";
+    else if (st === "sleep") mouth = "flat";
+    if (st !== "hibernate"){
+      const mr = T.mouth[mouth], mw = mr[0].length, my = eyeY + eyeH + 1;
+      mr.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== ".") put(cl + 1 - mw / 2 + i, my + j, ch); }));
+    }
+
+    /* branch and state accessories */
+    if (br === "athlete" && !lying){ const y = eyeY - 2; for (let x = 0; x < G; x++) if (body[y] && body[y][x]) put(x, y, "#E0475B"); }
+    if (br === "lazy" && st !== "happy" && !lying){ const t = topAt(cl) - 1; [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [1, -1], [2, -1], [3, -1], [2, -2], [3, -3], [4, -3]].forEach(([a, b]) => put(cl - 2 + a, t + b, b === 0 ? "#F2E8CF" : "#5B6CC2")); put(cl + 3, t - 4, "w"); }
+    if (br === "donut") [[left - 2, bot - 1], [right + 3, bot - 2], [left - 1, bot + 1]].forEach(([x, y]) => put(x, y, "#C98B4B"));
+    if (br === "balanced" && (f % 12) < 6){ put(left - 2, top + 1, "#F5C842"); put(right + 2, top + 4, "#F5C842"); put(left - 2, top, "w"); }
+    if (st === "sick"){ const my = eyeY + eyeH + 2; for (let k = 0; k < 4; k++) put(cr + k, my - (k >> 1), k === 3 ? "#E0475B" : "#DDE3EA"); }
+    /* hibernation: tucked under a checked blanket up to the nose */
+    if (lying) for (let y = eyeY + eyeH + 1; y < G; y++) for (let x = 0; x < G; x++) if (body[y][x]) px[y][x] = y === eyeY + eyeH + 1 ? "#F2E8CF" : ((x >> 1) + (y >> 1)) % 2 ? "#4F63C9" : "#7387E6";
     return px;
   }
 
@@ -772,15 +869,19 @@ function pxEl(name, size, cls){ const s = document.createElement("span"); s.styl
     if (!night){ ctx.fillStyle = "rgba(255,255,255,.7)"; const cxp = (f >> 1) % 64 - 10; ctx.fillRect(cxp * S, 5 * S, 7 * S, S); ctx.fillRect((cxp + 1) * S, 4 * S, 4 * S, S); }
     ctx.fillStyle = night ? "#2C3358" : "#B9CDAE"; ctx.fillRect(0, 34 * S, W * S, 6 * S);
     ctx.fillStyle = night ? "#3A4370" : "#A3BC96"; for (let x = 0; x < W; x += 4) ctx.fillRect((x + (x % 8 ? 1 : 0)) * S, 35 * S, S, S);
-    const grid = look.stage === "egg" ? egg(pet, f, look.crack || 0) : sprite(pet, look, f);
     /* where the pet stands: wanders a little when idle, chases the ball when playing */
-    let ox = 8, bx = 0, byy = 0;
-    if (st === "idle" && look.stage !== "egg") ox += Math.round(5 * Math.sin(f / 45));
-    if (st === "play" && look.toy !== "dance"){
-      const t = f % 48, k = t < 24 ? t / 24 : (48 - t) / 24;
-      bx = Math.round(6 + k * 34); byy = Math.round(31 - Math.abs(Math.sin(t / 48 * Math.PI * 4)) * 12);
-      ox += Math.max(-6, Math.min(6, Math.round((bx - 24) * 0.3)));
-    }
+    const place = g => {
+      let x = 8, bx = 0, by = 0;
+      if (st === "idle" && look.stage !== "egg") x += Math.round(5 * Math.sin(g / 45));
+      if (st === "play" && look.toy !== "dance"){
+        const t = g % 48, k = t < 24 ? t / 24 : (48 - t) / 24;
+        bx = Math.round(6 + k * 34); by = Math.round(31 - Math.abs(Math.sin(t / 48 * Math.PI * 4)) * 12);
+        x += Math.max(-6, Math.min(6, Math.round((bx - 24) * 0.3)));
+      }
+      return [x, bx, by];
+    };
+    const [ox, bx, byy] = place(f), moving = ox !== place(f - 1)[0] || ox !== place(f + 1)[0];
+    const grid = look.stage === "egg" ? egg(pet, f, look.crack || 0) : sprite(pet, {...look, moving}, f);
     const oy = 4;
     grid.forEach((row, y) => row.forEach((c, x) => { if (c){ ctx.fillStyle = c; ctx.fillRect((ox + x) * S, (oy + y) * S, S, S); } }));
     if (st === "sleep" || st === "hibernate") for (let k = 0; k < 2; k++){ const t = (f + k * 8) % 16; icon(ctx, "z", (33 + k * 4 + (t >> 3)) * S, (14 - (t >> 1)) * S, "#F4F1D0", S * (k ? 1 : 0.75) | 0 || 1); }
