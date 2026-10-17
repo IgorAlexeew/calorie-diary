@@ -769,7 +769,8 @@ function pxEl(name, size, cls){ const s = document.createElement("span"); s.styl
       if (i >= hw.length * .4) v += belly;
       return Math.max(2, v);
     });
-    if (squash) hw.splice(mid, 1);
+    /* breathing out: the body settles one row lower and the belly spreads a pixel, so the whole body moves, not only the head */
+    if (squash){ hw.splice(mid, 1); for (let i = Math.max(1, mid - 1); i < hw.length - 1; i++) hw[i] += 1; }
     return hw;
   }
   function sprite(pet, look, f){
