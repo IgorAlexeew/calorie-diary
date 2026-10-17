@@ -17,7 +17,7 @@
     body: ["round", "egg", "pear", "square", "ghost", "blob"],
     ears: ["none", "cat", "bunny", "bear", "antenna", "horns", "sprout"],
     eyes: ["dot", "big", "bead", "sleepy"],
-    mouth: ["smile", "cat", "flat", "fang"],
+    mouth: ["smile", "tiny", "wide", "flat", "fang"],
     tail: ["none", "curl", "fluff", "spikes"],
     pattern: ["none", "belly", "spots", "stripes"],
     palette: Object.keys(PALETTES)
@@ -291,8 +291,10 @@
       /* a shy pet blushes hard, a cross one goes red */
       if (st === "shy" || st === "angry") for (const dx of [0, 1]) for (const dy of [0, 1]){ const c = st === "shy" ? "#F59AB0" : "#E86A6A"; if (x + dx > L(rowAt(ei + eyeH + dy))) { put(x + dx, y + dy, c); put(MIR(x + dx) + 2 * sway, y + dy, c); } }
     }
-    let mouth = T.mouth[pet.mouth] ? pet.mouth : "smile";
+    /* the old "cat" ω read like a moustache: older pets that rolled it get the small v */
+    let mouth = pet.mouth === "cat" ? "tiny" : T.mouth[pet.mouth] ? pet.mouth : "smile";
     if (st === "eat") mouth = (f % 4) < 2 ? "open" : "chew";
+    else if (st === "happy" || st === "play") mouth = "grin";
     else if (st === "tickle") mouth = "open";
     else if (st === "angry") mouth = f % 4 < 2 ? "frown" : "flat";
     else if (st === "shy") mouth = "flat";
