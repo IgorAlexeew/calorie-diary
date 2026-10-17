@@ -3,10 +3,14 @@
 
     <!-- screen 1: the pet -->
     <main class="screen petScreen" id="petScreen" aria-label="Питомец">
+      <div class="world" id="world">
+        <canvas id="petCv" width="192" height="160" aria-label="Питомец, нажми, чтобы погладить"></canvas>
+      </div>
+      <div class="hud" id="hud">
       <header class="petTop">
         <div class="petId">
           <b id="petName">Яйцо</b>
-          <span id="petStage">ждёт первой записи</span>
+          <span class="stageLine"><span id="petStage">ждёт первой записи</span><span class="sceneTag" id="sceneTag" hidden></span></span>
         </div>
         <div class="topBtns">
           <span class="streak num" id="streak" hidden></span>
@@ -22,12 +26,9 @@
 
       <div class="say" id="petSay" aria-live="polite"><span id="petSayText">…</span></div>
 
-      <div class="scene px">
-        <canvas id="petCv" width="192" height="160" aria-label="Питомец, нажми, чтобы погладить"></canvas>
-        <span class="sceneTag" id="sceneTag" hidden></span>
-      </div>
+      <div class="petSpace" id="petSpace" aria-hidden="true"></div>
 
-      <div class="stats" id="petStats"></div>
+      <div class="stats px" id="petStats"></div>
 
       <section class="day px" aria-label="Итог дня">
         <div class="dayHead">
@@ -42,6 +43,7 @@
         <div class="macro"><span>Углеводы</span><div class="bar"><i id="cBar" style="width:0"></i></div><span class="num" id="cVal">0 / 175 г</span></div>
       </section>
       <div id="notice" class="notice" hidden></div>
+      </div>
     </main>
 
     <!-- screen 2: the diary -->

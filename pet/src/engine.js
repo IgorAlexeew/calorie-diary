@@ -271,12 +271,7 @@
       mr.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== ".") put(16 - mw / 2 + i + sway, my + j, ch); }));
     }
     /* a sleep bubble from the nose grows and pops */
-    if (st === "sleep"){
-      const t = (f >> 1) % 8, r = [0, 1, 1, 2, 2, 2, 0, 0][t], mw = (T.mouth[mouth] || T.mouth.flat)[0].length, bx = 16 + mw / 2 + sway + r, by = my + 1;
-      if (r === 1){ put(bx, by, "#CFE8FF"); }
-      if (r >= 2) for (let a = -r + 1; a < r; a++) for (let b = -r + 1; b < r; b++) if (Math.abs(a) + Math.abs(b) <= r) put(bx + a, by + b, Math.abs(a) + Math.abs(b) === r - 1 ? "#9CC9F0" : "#DDF0FF");
-      if (r >= 2) put(bx - 1, by - 1, "w");
-    }
+    if (st === "sleep"){ const mw = (T.mouth[mouth] || T.mouth.flat)[0].length; px.bubble = [16 + mw / 2 + sway, my]; }
 
     /* branch and state accessories */
     if (br === "athlete" && !lying){ const y = eyeY - 2; for (let x = 0; x < G; x++) if (body[y] && body[y][x]) put(x, y, "#E0475B"); }
@@ -286,6 +281,7 @@
     if (st === "sick") for (let k = 0; k < 4; k++) put(17 + sway + k, my + 1 - (k >> 1), k === 3 ? "#E0475B" : "#DDE3EA");
     /* hibernation: tucked under a checked blanket up to the nose */
     if (lying) for (let y = eyeY + eyeH + 1; y < G; y++) for (let x = 0; x < G; x++) if (body[y][x]) px[y][x] = y === eyeY + eyeH + 1 ? "#F2E8CF" : ((x >> 1) + (y >> 1)) % 2 ? "#4F63C9" : "#7387E6";
+    px.mouthY = my; px.midX = 16 + sway;
     return px;
   }
 
@@ -304,6 +300,55 @@
     return px;
   }
 
+
+  /* ---------- food: a small pixel library, picked by what was logged ---------- */
+  const FOOD_COL = {r: "#E0475B", R: "#A62B3E", g: "#6CC24A", G: "#3E8E3A", b: "#7A4A2A", w: "#FFFFFF", W: "#C9CED6", y: "#F2C94C", Y: "#C8961E",
+    t: "#D9A066", T: "#A86B32", c: "#F4EBD0", C: "#D8CBA5", m: "#B5653A", M: "#7A3A1C", s: "#8DB3D6", S: "#4E7397", k: "#1B1F24",
+    u: "#E8EDF2", U: "#A9B4C2", o: "#F08A3C", O: "#B85A1A", p: "#F5A3B5", a: "#BFE3F2"};
+  const FOOD = {
+    apple:    ["....bg..", "..rrbrr.", ".rwrrrrr", ".rwrrrrR", ".rrrrrrR", ".rrrrrRR", "..rrrRR.", "...RR..."],
+    banana:   ["......b.", ".....yY.", "....yyY.", "...yyY..", "..yyyY..", "yyyyY...", "bYYY....", "........"],
+    berry:    ["..ggg...", ".rgggr..", "rryrryr.", "rrrrrrr.", ".ryrrr..", ".rrryr..", "..rrr...", "...r...."],
+    carrot:   ["......gg", ".....gg.", "....oog.", "...ooO..", "..ooO...", ".ooO....", "oO......", "........"],
+    bread:    [".TTTTT..", "TttttTT.", "TcccccT.", "TcccccT.", "TcCcccT.", "TccccCT.", "TTTTTTT.", "........"],
+    cheese:   ["......yy", "....yyyy", "..yyyyYy", "yyyyyyyy", "yYyyyYyy", "yyyyyyyy", "YYYYYYYY", "........"],
+    egg:      ["..www...", ".wwwwww.", "wwwyywww", "wwyyyYww", "wwwyYwww", ".wwwwwwW", "..wwwWW.", "........"],
+    meat:     ["...mmm..", "..mmmmm.", ".mmmmmmM", ".mmmmmMM", "..mmmMM.", "...wM...", "..ww....", ".w.w...."],
+    fish:     ["........", "..sss..s", ".sssssSS", "sksssss.", "ssssssSS", ".SSSSS.S", "........", "........"],
+    salad:    ["..g.r.g.", ".gGgrgGg", "gGgggrgG", "uuuuuuuu", ".uuuuuuU", "..uuuuU.", "...UUU..", "........"],
+    soup:     [".w...w..", "..w...w.", ".w...w..", "oooooooo", "uuuuuuuu", ".uuuuuuU", "..uUUUU.", "........"],
+    bowl:     ["........", "..cccc..", ".ccCcccc", "ccccCccc", "uuuuuuuu", ".uuuuuuU", "..uUUUU.", "........"],
+    cake:     ["...r....", "..wwww..", ".pppppp.", ".wwwwww.", ".tttttt.", ".pppppp.", ".TTTTTT.", "........"],
+    cup:      ["..s.s...", "...s.s..", "wbbbbbw.", "wwwwwwww", "wwwwwW.w", "wwwwwWww", ".wwwWW..", "........"],
+    milk:     [".aaaaa..", ".a...a..", ".wwwww..", ".wwwww..", ".wwwwW..", ".wwwwW..", ".aaaaa..", "........"],
+    pizza:    ["tttttttt", "Tyyryyy.", ".yyyyry.", ".yryyy..", "..yyyy..", "..yyy...", "...yy...", "...y...."],
+    sandwich: ["..tttt..", ".tttwtt.", "tttttttt", "gggggggg", "mmmmmmmm", "yyyyyyyy", "TTTTTTTT", "........"]
+  };
+  /* the first rule that matches the logged title, then the dishes, then the person's words */
+  const FOOD_RULES = [
+    [/кофе|чай|капучин|латте|какао/, "cup"], [/молок|кефир|йогурт|ряженк|смузи|сок\b|напит|протеин/, "milk"],
+    [/пицц/, "pizza"], [/бургер|бутерброд|сэндвич|шаурм|ролл|лаваш|хот-?дог/, "sandwich"],
+    [/торт|пирож|шоколад|конфет|печень|десерт|морожен|сырник|блин|вафл|булочк|круассан|пончик|сладк/, "cake"],
+    [/суп|борщ|щи\b|солянк|бульон|окрошк|уха\b/, "soup"], [/рыб|лосос|тунец|сёмг|семг|форел|скумбр|креветк|минта|треск/, "fish"],
+    [/яйц|омлет|яичниц/, "egg"], [/куриц|курин|мяс|говяд|свин|котлет|стейк|индейк|фарш|колбас|сосиск|ветчин|бекон|шашлык|грудк/, "meat"],
+    [/сыр|творог/, "cheese"], [/хлеб|батон|тост|лепёшк|лепешк|хлебц/, "bread"],
+    [/гречк|рис\b|риса|рисом|каш|овсян|макарон|паст|плов|картоф|пюре|лапш|спагет/, "bowl"],
+    [/салат|овощ|огур|помидор|томат|капуст|брокколи|перец/, "salad"], [/морков/, "carrot"], [/банан/, "banana"],
+    [/ягод|клубник|черник|малин|вишн|виноград/, "berry"], [/яблок|груш|фрукт|апельсин|мандарин|персик|киви/, "apple"]
+  ];
+  function foodFor(...texts){
+    for (const t of texts){ const s = String(t || "").toLowerCase(); for (const [re, n] of FOOD_RULES) if (re.test(s)) return n; }
+    return "bowl";
+  }
+  /* a food sprite with its own outline; eaten (0..1) takes bites from the right */
+  function drawFood(ctx, name, x, y, S, eaten){
+    const m = FOOD[name] || FOOD.apple, cut = 8 - Math.round((eaten || 0) * 8);
+    const on = (i, j) => j >= 0 && j < 8 && i >= 0 && i < 8 && m[j][i] !== "." && i < cut - (j % 2 && cut < 8 ? 1 : 0);
+    ctx.fillStyle = OUT;
+    for (let j = -1; j <= 8; j++) for (let i = -1; i <= 8; i++) if (!on(i, j) && (on(i - 1, j) || on(i + 1, j) || on(i, j - 1) || on(i, j + 1))) ctx.fillRect((x + i) * S, (y + j) * S, S, S);
+    for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) if (on(i, j)){ ctx.fillStyle = FOOD_COL[m[j][i]] || m[j][i]; ctx.fillRect((x + i) * S, (y + j) * S, S, S); }
+  }
+
   /* little effects drawn in scene space around the pet */
   const ICONS = {
     heart: ["01010", "11111", "11111", "01110", "00100"],
@@ -319,14 +364,27 @@
   /* draws a scene: background, ground, pet, effects. Canvas is 48×40 logical px times scale */
   function draw(ctx, pet, look, f, opts){
     opts = opts || {};
-    const S = opts.scale || 4, W = 48, H = 40, st = look.state || "idle";
+    const S = opts.scale || 4, W = opts.W || 48, H = opts.H || 40, gy = opts.ground || 34, st = look.state || "idle";
     const night = st === "sleep" || st === "hibernate" || opts.night;
     ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = night ? "#1D2340" : (opts.bg || "#DCE8D5"); ctx.fillRect(0, 0, W * S, H * S);
-    if (night) for (const [x, y] of [[5, 4], [14, 9], [38, 6], [43, 14], [26, 3]]) if ((f + x) % 16 > 2){ ctx.fillStyle = "#F4F1D0"; ctx.fillRect(x * S, y * S, S, S); }
-    if (!night){ ctx.fillStyle = "rgba(255,255,255,.7)"; const cxp = (f >> 1) % 64 - 10; ctx.fillRect(cxp * S, 5 * S, 7 * S, S); ctx.fillRect((cxp + 1) * S, 4 * S, 4 * S, S); }
-    ctx.fillStyle = night ? "#2C3358" : "#B9CDAE"; ctx.fillRect(0, 34 * S, W * S, 6 * S);
-    ctx.fillStyle = night ? "#3A4370" : "#A3BC96"; for (let x = 0; x < W; x += 4) ctx.fillRect((x + (x % 8 ? 1 : 0)) * S, 35 * S, S, S);
+    /* the world fills the whole canvas: sky, far hills, ground; the pet's own 48×40 stage sits on the ground in the middle */
+    const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x * S, y * S, w * S, h * S); };
+    R(0, 0, W, H, night ? "#1D2340" : (opts.bg || "#DCE8D5"));
+    R(0, Math.max(0, gy - 16), W, 16, night ? "#222A4C" : "#D2E2CB");
+    if (night) for (let k = 0; k < W * gy / 60; k++){ const x = Math.floor(hash(k, 7) * W), y = Math.floor(hash(k, 9) * (gy - 6)); if ((f + k * 5) % 20 > 2) R(x, y, 1, 1, "#F4F1D0"); }
+    else for (let k = 0; k < Math.max(2, gy / 12); k++){
+      const y = 3 + Math.floor(hash(k, 3) * (gy - 14)), len = 5 + Math.floor(hash(k, 4) * 5), x = ((Math.floor(hash(k, 5) * W) + (f >> 2)) % (W + 14)) - 10;
+      R(x, y, len, 1, "rgba(255,255,255,.75)"); R(x + 1, y - 1, len - 3, 1, "rgba(255,255,255,.75)");
+    }
+    for (let x = 0; x < W; x++){ const h = 3 + Math.round(2 * Math.sin(x / 7) + Math.sin(x / 3 + 1)); R(x, gy - h, 1, h, night ? "#28305A" : "#C3D6BA"); }
+    R(0, gy, W, H - gy, night ? "#2C3358" : "#B9CDAE");
+    for (let y = gy + 1, r = 0; y < H; y += 4, r++) for (let x = (r % 2) * 2; x < W; x += 4) R(x, y, 1, 1, night ? "#3A4370" : "#A3BC96");
+    if (st === "hibernate"){
+      /* winter outside: falling snow and a snowdrift */
+      for (let k = 0; k < W * H / 140; k++){ const x = Math.floor(hash(k, 1) * W), y = (f + Math.floor(hash(k, 2) * H)) % H; R((x + (y >> 3)) % W, y, 1, 1, "#FFFFFF"); }
+      R(0, gy - 1, W, 2, "#E6EDF7"); for (let x = 0; x < W; x += 6) R(x, gy - 2, 3, 1, "#E6EDF7");
+    }
+    ctx.save(); ctx.translate(Math.floor((W - 48) / 2) * S, (gy - 34) * S);
     /* where the pet stands: wanders a little when idle, chases the ball when playing */
     const place = g => {
       let x = 8, bx = 0, by = 0;
@@ -342,20 +400,35 @@
     const grid = look.stage === "egg" ? egg(pet, f, look.crack || 0) : sprite(pet, {...look, moving}, f);
     const oy = 4;
     grid.forEach((row, y) => row.forEach((c, x) => { if (c){ ctx.fillStyle = c; ctx.fillRect((ox + x) * S, (oy + y) * S, S, S); } }));
+    if (grid.bubble){
+      /* a see-through sleep bubble over the face: grows from the nose and pops */
+      const r = [0, 1, 1, 2, 2, 3, 3, 0][(f >> 1) % 8], [bx0, by0] = grid.bubble;
+      if (r){
+        const bx = ox + bx0 + r, by = oy + by0 + 1 - r;
+        for (let a = -r; a <= r; a++) for (let b = -r; b <= r; b++){
+          const d = Math.abs(a) + Math.abs(b) * 1.0;
+          if (d > r + .5) continue;
+          ctx.fillStyle = d > r - .6 ? "rgba(170,215,255,.85)" : "rgba(200,232,255,.35)";
+          ctx.fillRect((bx + a) * S, (by + b) * S, S, S);
+        }
+        if (r >= 2){ ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.fillRect((bx - 1) * S, (by - r + 1) * S, S, S); }
+      }
+    }
     if (st === "sleep" || st === "hibernate") for (let k = 0; k < 2; k++){ const t = (f + k * 8) % 16; icon(ctx, "z", (33 + k * 4 + (t >> 3)) * S, (14 - (t >> 1)) * S, "#F4F1D0", S * (k ? 1 : 0.75) | 0 || 1); }
-    if (st === "happy" || (st === "eat" && f % 16 > 10)) for (let k = 0; k < 3; k++){ const t = (f * 2 + k * 7) % 20; icon(ctx, "heart", (10 + k * 13) * S, (16 - t / 2) * S | 0, "#E0475B", S * .6 | 0 || 1); }
-    if (st === "eat" && f % 16 <= 10){ const t = f % 16; icon(ctx, "apple", 22 * S, Math.min(13, t * 2) * S, "#E0475B", S * .8 | 0 || 1); }
+    const eatT = look.eatT == null ? (f % 24) / 24 : look.eatT;
+    if (st === "happy" || (st === "eat" && eatT > .85)) for (let k = 0; k < 3; k++){ const t = (f * 2 + k * 7) % 20; icon(ctx, "heart", (10 + k * 13) * S, (16 - t / 2) * S | 0, "#E0475B", S * .6 | 0 || 1); }
+    if (st === "eat" && eatT <= .85 && grid.mouthY != null){
+      /* the logged food drops into the pet's hands and is eaten bite by bite */
+      const fx = ox + grid.midX - 4, fy = oy + grid.mouthY + 2, drop = Math.max(0, Math.round((.15 - eatT) / .15 * fy));
+      const eaten = eatT < .2 ? 0 : Math.min(1, Math.floor((eatT - .2) / .65 * 4) / 4);
+      drawFood(ctx, look.food || "apple", fx, fy - drop, S, eaten);
+      if (eaten > 0 && f % 3 === 0){ ctx.fillStyle = FOOD_COL.t; ctx.fillRect((fx + 8 - eaten * 8) * S, (fy + 9 + (f % 2)) * S, S, S); }
+    }
     if (st === "sad") icon(ctx, "drop", (34 + (f % 2)) * S, 14 * S, "#6AB3F0", S * .7 | 0 || 1);
-    if (st === "hungry"){ ctx.fillStyle = "#FFFFFF"; ctx.fillRect(34 * S, 5 * S, 11 * S, 9 * S); ctx.fillRect(32 * S, 13 * S, 2 * S, 2 * S); icon(ctx, "apple", 36 * S, 7 * S, "#E0475B", S); }
+    if (st === "hungry"){ ctx.fillStyle = "#FFFFFF"; ctx.fillRect(33 * S, 3 * S, 12 * S, 12 * S); ctx.fillRect(31 * S, 14 * S, 2 * S, 2 * S); drawFood(ctx, look.food || "apple", 35, 5, S, 0); }
     if (st === "play" && look.toy !== "dance"){ icon(ctx, "ball", bx * S, byy * S, "#E0475B", S); ctx.fillStyle = "#FFFFFF"; ctx.fillRect((bx + 1) * S, (byy + 1) * S, S, S); }
     if (st === "play" && look.toy === "dance") for (let k = 0; k < 2; k++){ const t = (f + k * 9) % 18; icon(ctx, "note", (k ? 36 : 6) * S, (18 - (t >> 1)) * S, k ? "#8A63D2" : "#3E8FD8", S * .7 | 0 || 1); }
-    if (st === "hibernate"){
-      /* winter outside: falling snow and a snowdrift */
-      ctx.fillStyle = "#FFFFFF";
-      for (let k = 0; k < 14; k++){ const x = (k * 11 + (k % 3) * 5) % 48, y = (f + k * 7) % 34; ctx.fillRect(((x + (y >> 3)) % 48) * S, y * S, S, S); }
-      ctx.fillStyle = "#E6EDF7"; ctx.fillRect(0, 33 * S, W * S, 2 * S);
-      for (let x = 0; x < W; x += 6) ctx.fillRect(x * S, 32 * S, 3 * S, S);
-    }
+    ctx.restore();
   }
-  window.PetEngine = {PALETTES, PARTS, NAMES, randomPet, draw, sprite};
+  window.PetEngine = {PALETTES, PARTS, NAMES, FOOD, randomPet, draw, sprite, foodFor, drawFood};
 })();

@@ -451,7 +451,7 @@ function renderWeek(){
   keys.forEach((k,i) => {
     const v = vals[i], x = left + i*bw + bw*0.2, w = bw*0.6;
     const solid = k === cur, bh = Math.max(0, H - bottom - y(v));
-    mk("rect",{x, y: y(Math.max(v,0)), width:w, height: bh, rx:0, fill: "url(#wkGrad)", "fill-opacity": solid ? 1 : 0.6});
+    mk("rect",{x, y: y(Math.max(v,0)), width:w, height: bh, rx:0, "shape-rendering":"crispEdges", fill: v > g * 1.1 ? "var(--over)" : v > g * 1.02 ? "var(--warn)" : "var(--ok)", "fill-opacity": solid ? 1 : 0.55});
     if (v > 0){
       const inside = bh >= 24;
       const t = mk("text",{x: x + w/2, y: inside ? y(v) + 16 : y(v) - 5, "text-anchor":"middle", "font-size": inside ? 12 : 11, "font-weight": inside ? 700 : 400,
@@ -773,7 +773,7 @@ async function applyActions(dk, acts, photoIds, userText){
       photosUsed = photosUsed || ph.length > 0;
       const entry = {id:newId(), text: userText || ("По фото: " + dishes.map(d => d.name).join(", ")), title: str(a.title, 80) || dishes[0].name, meal: clampMeal(a.meal), time: iso,
         dishes, items, note: str(a.note, 160), photos: ph, photo: ph.length > 0, kcal: t.kcal, p: t.p, f: t.f, c: t.c};
-      entries.push(entry); changed = true; petEvent("eat");
+      entries.push(entry); changed = true; petEvent("eat", 0, PetEngine.foodFor(entry.title, dishes.map(d => d.name).join(" "), entry.text));
       out.push({type, state:"done", entryId: entry.id, title: entry.title, meal: entry.meal, kcal: t.kcal, p: t.p, f: t.f, c: t.c, grams: sumGrams(items), dishes: dishes.map(d => d.name)});
     } else if (type === "edit_meal"){
       const idx = entries.findIndex(e => e.id === str(a.id, 60));

@@ -113,8 +113,9 @@ function petState(s){
   return "idle";
 }
 function petToy(){ if (petDemo && petDemo.until > Date.now() && petDemo.toy) return petDemo.toy; return Math.floor(Date.now() / 30000) % 2 ? "dance" : "ball"; }
-function petEvent(state, ms){
-  petEvt = {state, until: Date.now() + (ms || 4500)};
+function petEvent(state, ms, food){
+  const dur = ms || 4500;
+  petEvt = {state, until: Date.now() + dur, dur, food};
   if (state === "eat") setTimeout(() => requestLine("eat", true), 700);
 }
 
@@ -162,16 +163,15 @@ async function requestLine(reason, force){
 }
 
 /* ---------- hatching: the AI picks parts from the templates ---------- */
-async function genPetAI(){
+/* parts are rolled by chance (the AI kept choosing the same green sprout); the AI names the pet and gives it a character */
+async function genPetAI(parts){
   if (!sample) return null;
-  const P = PetEngine.PARTS;
-  const prompt = `Ты собираешь 8-битного питомца для игры-дневника питания. Выбери по одной детали из каждого списка так, чтобы получился цельный и милый персонаж, и придумай ему имя, характер и первую фразу.
-Списки:
-${Object.entries(P).map(([k, v]) => `${k}: ${v.join(", ")}`).join("\n")}
-Значения бери строго из списков. Случайное число для разнообразия: ${Math.floor(Math.random() * 1e6)}.
-Ответь только JSON: {"body":"…","ears":"…","eyes":"…","mouth":"…","tail":"…","pattern":"…","palette":"…","name":"короткое русское имя, одно слово до 10 букв, можно съедобное","trait":"характер, 3–6 слов","greeting":"первая фраза хозяину, до 80 символов"}`;
+  const prompt = `Ты придумываешь характер 8-битному питомцу из игры-дневника питания. Детали уже выпали случайно:
+тело ${parts.body}, уши или макушка ${parts.ears}, глаза ${parts.eyes}, рот ${parts.mouth}, хвост ${parts.tail}, узор ${parts.pattern}, цвет ${parts.palette}.
+Придумай имя, которое подходит к этому облику, характер и первую фразу. Случайное число для разнообразия: ${Math.floor(Math.random() * 1e6)}.
+Ответь только JSON: {"name":"короткое русское имя, одно слово до 10 букв, можно съедобное","trait":"характер, 3–6 слов","greeting":"первая фраза хозяину, до 80 символов"}`;
   const r = await sample.json(prompt, {modelTier:"quick", cache:false});
-  return cleanPet(r);
+  return r && typeof r === "object" ? cleanPet({...parts, name: r.name, trait: r.trait, greeting: r.greeting}) : null;
 }
 function cleanPet(r){
   const P = PetEngine.PARTS, out = {};
@@ -188,9 +188,10 @@ async function hatchPet(){
   const gen = (pet && pet.gen || 0) + 1;
   hatching = {start: Date.now(), palette: pick(PetEngine.PARTS.palette)};
   pet = null; petOnRender();
+  const parts = PetEngine.randomPet(); delete parts.name; parts.palette = hatching.palette;
   let p = null;
-  try { p = await genPetAI(); } catch (e) {}
-  if (!p) p = cleanPet({trait: pick(["любопытный, обожает хрустящее", "соня и сладкоежка", "бодрый, любит овощи", "ворчит, но добрый"])});
+  try { p = await genPetAI(parts); } catch (e) {}
+  if (!p) p = cleanPet({...parts, trait: pick(["любопытный, обожает хрустящее", "соня и сладкоежка", "бодрый, любит овощи", "ворчит, но добрый"])});
   const wait = hatching.start + 2800 - Date.now();
   if (wait > 0) await new Promise(r => setTimeout(r, wait));
   /* credit the last two weeks so a diary with history doesn't start from zero */
@@ -270,6 +271,8 @@ function petLook(){
   }
   const st = petStatsNow ? petState(s) : "idle", stage = petStage(petAge());
   const look = {state: st, fat: s.fat, muscle: s.muscle, branch: petBranch(s, stage), stage, toy: petToy()};
+  const now = Date.now(), ev = petDemo && petDemo.until > now ? petDemo : petEvt && petEvt.until > now ? petEvt : null;
+  if (ev && ev.food){ look.food = ev.food; look.eatT = 1 - (ev.until - now) / (ev.dur || 4500); }
   if (petLookDemo) Object.assign(look, petLookDemo);
   return {pet, look};
 }

@@ -119,7 +119,7 @@ $("#petMenuBtn").onclick = () => {
 const DEMO = [["Ест","eat"],["Играет с мячом","play","ball"],["Танцует","play","dance"],["Радуется","happy"],["Грустит","sad"],["Голоден","hungry"],["Болеет","sick"],["Спит","sleep"],["Спячка","hibernate"]];
 for (const [t, st, toy] of DEMO){
   const b = el("button",{type:"button",text:t});
-  b.onclick = () => { if (!pet) return; petDemo = {state: st, toy, until: Date.now() + 6000}; setLine(localLine(petStatsNow, st)); closeMenu(); showScreen("pet"); };
+  b.onclick = () => { if (!pet) return; petDemo = {state: st, toy, until: Date.now() + 6000, dur: 6000, food: st === "eat" ? pick(Object.keys(PetEngine.FOOD)) : null}; setLine(localLine(petStatsNow, st)); closeMenu(); showScreen("pet"); };
   $("#pmDemo").append(b);
 }
 /* preview any age and branch; stays until "Как сейчас" */
@@ -158,7 +158,14 @@ $("#petCv").parentElement.onclick = () => {
   try { const l = JSON.parse(localStorage.getItem("petLine") || "null"); if (l && l.d === todayKey() && l.t) setLine(l.t); } catch (e) {}
   function tick(){
     const {pet: p, look} = petLook();
-    PetEngine.draw(ctx, p, look, f, {scale: 4});
+    /* size the world to the screen; the ground lies just under the free space between the HUD panels */
+    const cv = $("#petCv"), wr = $("#world").getBoundingClientRect(), dpr = Math.min(3, devicePixelRatio || 1);
+    if (wr.width && wr.height){
+      const S = Math.max(2, Math.floor(Math.min(wr.width, 520) * dpr / 50)), W = Math.ceil(wr.width * dpr / S), H = Math.ceil(wr.height * dpr / S);
+      if (cv.width !== W * S || cv.height !== H * S){ cv.width = W * S; cv.height = H * S; cv.style.width = W * S / dpr + "px"; cv.style.height = H * S / dpr + "px"; }
+      const sp = $("#petSpace").getBoundingClientRect(), ground = Math.max(32, Math.min(H - 2, Math.round((sp.bottom - wr.top) * dpr / S)));
+      PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground});
+    }
     const tag = look.stage === "egg" ? "" : (look.toy === "dance" && look.state === "play" ? "Танцует" : STATE_TAG[look.state] || "");
     if (tag !== lastTag){ const t = $("#sceneTag"); t.hidden = !tag; t.textContent = tag; lastTag = tag; }
     f++;
