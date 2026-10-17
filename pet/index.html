@@ -757,7 +757,12 @@ function pxEl(name, size, cls){ const s = document.createElement("span"); s.styl
       fang:   ["k..k", ".kk.", ".w.."],
       frown:  [".kk.", "k..k"],
       open:   [".kk.", "krrk", ".kk."],
-      chew:   ["kkkk"]
+      chew:   ["kkkk"],
+      tiny:   ["k.k", ".k."],
+      wide:   ["k....k", ".kkkk."],
+      grin:   ["kkkk", "krrk", ".kk."],
+      kitty:  ["k.k.k", ".k.k."],
+      dot:    ["kk", "kk"]
     }
   };
   const SOLID = "mldcgG";
@@ -930,7 +935,7 @@ function pxEl(name, size, cls){ const s = document.createElement("span"); s.styl
     else if (st === "tickle") eye = "joy";
     else if (st === "angry") eye = "angry";
     else if (st === "happy" || st === "play" || (st === "eat" && (f % 4) > 1)) eye = "joy";
-    else if (st === "sick") eye = "x";
+    else if (st === "sick") eye = "sleepy";
     else if (st === "sad") eye = "sad";
     else if (br === "lazy") eye = "sleepy";
     /* sleepy in the evening, early morning and when hunger keeps it up at night */
@@ -951,7 +956,8 @@ function pxEl(name, size, cls){ const s = document.createElement("span"); s.styl
     else if (st === "angry") mouth = f % 4 < 2 ? "frown" : "flat";
     else if (st === "shy") mouth = "flat";
     else if (st === "hungry") mouth = (f >> 2) % 2 ? "open" : "frown";
-    else if (st === "sad" || st === "sick" || br === "grump") mouth = "frown";
+    else if (st === "sick") mouth = "flat";
+    else if (st === "sad" || br === "grump") mouth = "frown";
     else if (st === "sleep") mouth = "flat";
     /* a yawn now and then when it is late or early */
     if (st === "idle" && (look.tod === "evening" || look.tod === "morning") && f % 48 < 6) mouth = "open";
@@ -960,7 +966,9 @@ function pxEl(name, size, cls){ const s = document.createElement("span"); s.styl
       const mr = T.mouth[mouth], mw = mr[0].length;
       mr.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== ".") put(16 - mw / 2 + i + sway, my + j, ch); }));
     }
+    /* sick: a thermometer in the mouth (in bed it peeks over the blanket) */
     if (sickBed){ const y = eyeY + eyeH; for (let x = 16; x <= 18; x++) put(x + sway, y, "#FFFFFF"); put(19 + sway, y, "#E0475B"); }
+    else if (st === "sick"){ for (let x = 17; x <= 19; x++) put(x + sway, my, "#FFFFFF"); put(20 + sway, my, "#E0475B"); }
     /* a sleep bubble from the nose grows and pops */
     if (st === "sleep"){ const mw = (T.mouth[mouth] || T.mouth.flat)[0].length; px.bubble = [16 + mw / 2 + sway, my]; }
 
