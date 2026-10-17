@@ -200,9 +200,10 @@ svg text{font-size-adjust:.5!important}
 
 .chipWait{font-size:14px}
 .hudPanel[hidden]{display:none!important}
-/* the id line: every piece on one 26px row, centred on the same axis */
-.idLine{align-items:center}
-.idLine > *:not(.topBtns){display:inline-flex;align-items:center;height:26px;line-height:26px}
-.idLine b{line-height:26px}
-.idLine .sceneTag{height:24px;padding:0 6px}
-.idLine .streak{gap:3px}
+/* the id line: name, stage and state share one text baseline; the streak sits at the right, next to the buttons */
+.idLine{align-items:baseline}
+.idLine > *:not(.topBtns){display:inline-block;line-height:1.2}
+.idLine b{line-height:1.2}
+.idLine .sceneTag{padding:0 6px}
+.idLine .streak{margin-left:auto;display:inline-flex;align-items:baseline;gap:3px}
+.idLine .streak svg{align-self:center}
