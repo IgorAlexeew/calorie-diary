@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Дневник калорий</string>
+    <string name="widget_small_description">Кольцо калорий и остаток на сегодня</string>
+    <string name="widget_medium_description">Калории, белки, жиры, углеводы и кнопка записи</string>
+    <string name="widget_strip_description">Остаток калорий и кнопка записи</string>
+</resources>

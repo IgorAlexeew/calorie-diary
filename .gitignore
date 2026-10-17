@@ -1,0 +1,11 @@
+out/
+build/
+.gradle/
+local.properties
+secrets.properties
+signing/
+*.p12
+*.jks
+*.apk
+.idea/
+*.iml

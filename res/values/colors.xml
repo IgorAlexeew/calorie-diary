@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- widget colors, same tokens as the page (assets/index.html :root) -->
+<resources>
+    <color name="widget_bg">#FFFFFF</color>
+    <color name="widget_fg">#171A22</color>
+    <color name="widget_muted">#5E6577</color>
+    <color name="widget_track">#E6E8EF</color>
+    <color name="widget_ok">#1F8A5B</color>
+    <color name="widget_over">#C8343B</color>
+    <color name="widget_accent">#2F4BD8</color>
+    <color name="widget_on_accent">#FFFFFF</color>
+    <color name="widget_p">#3AA655</color>
+    <color name="widget_f">#E5484D</color>
+    <color name="widget_c">#E9B71E</color>
+</resources>
