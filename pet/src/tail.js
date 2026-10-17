@@ -15,7 +15,7 @@ function showScreen(name){
   if (name === "diary") $("#toPet").focus();
 }
 $("#toDiary").innerHTML = pxIcon("book", 20);
-$("#toPet").innerHTML = pxIcon("back", 18);
+$("#toPet").innerHTML = pxIcon("close", 16);
 $("#petMenuBtn").innerHTML = pxIcon("menu", 18);
 $("#prev").innerHTML = pxIcon("chevL", 14);
 $("#next").innerHTML = pxIcon("chevR", 14);
