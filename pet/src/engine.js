@@ -101,9 +101,11 @@
     const add = stage === "adult" ? 3 : stage === "young" ? 2 : 0;
     for (let k = 0; k < add; k++) hw.splice(mid, 0, hw[mid]);
     const up = stage === "adult" ? 2 : stage === "young" ? 1 : 0;
-    const belly = Math.max(-1, Math.min(2, Math.round((fat - 50) / 25))) + (br === "donut" ? 2 : 0) - (br === "slim" ? 1 : 0);
+    /* fat swells the belly most; a slim or donut branch changes the whole silhouette, head included */
+    const belly = Math.max(-1, Math.min(2, Math.round((fat - 50) / 25))) + (br === "donut" ? 1 : 0);
+    const whole = br === "slim" ? -2 : br === "donut" ? 1 : 0;
     hw = hw.map((w, i) => {
-      let v = w + (i > 0 ? up : 0);
+      let v = w + (i > 0 ? up + whole : Math.min(0, whole + 1));
       if (i >= hw.length * .4) v += belly;
       return Math.max(2, v);
     });
