@@ -62,9 +62,9 @@
       sprout:  [["gg..gg", ".gggg.", "..GG..", "..GG.."], [".g..g.", "gggggg", "..GG..", "..GG.."]]
     },
     tail: {
-      curl:   [{px: 0, py: 3, rows: ["..mm", "...m", "...m", "mmm."]}, {px: 0, py: 2, rows: ["...mm", "....m", "mmmm."]}],
-      fluff:  [{px: 0, py: 3, rows: ["..ll", ".lll", "mml.", "mm.."]}, {px: 0, py: 2, rows: ["..lll", "mmlll", "mmm.."]}],
-      spikes: [{px: 0, py: 3, rows: ["...d", "..dm", ".dm.", "mm.."]}, {px: 0, py: 2, rows: ["...dd", ".ddm.", "mmm.."]}]
+      curl:   [{px: 0, py: 1, rows: ["....m", "mmmm."]}, {px: 0, py: 0, rows: ["mmmmm"]}],
+      fluff:  [{px: 0, py: 1, rows: ["..ll", "mmll"]}, {px: 0, py: 0, rows: ["mmll", "..ll"]}],
+      spikes: [{px: 0, py: 1, rows: ["..d.", "mmmd"]}, {px: 0, py: 0, rows: ["mmmd", "..d."]}]
     },
     arm: {
       down:  {px: 1, py: 0, rows: ["mm", "mm", "mm"]},
@@ -107,7 +107,7 @@
       if (i >= hw.length * .4) v += belly;
       return Math.max(2, v);
     });
-    if (squash){ hw.splice(mid, 1); hw = hw.map((w, i) => i >= mid - 1 ? w + 1 : w); }
+    if (squash) hw.splice(mid, 1);
     return hw;
   }
   function sprite(pet, look, f){
@@ -168,7 +168,7 @@
 
     /* behind the body: tail and ears */
     if (T.tail[pet.tail]){
-      const i = H - 2, wag = st === "happy" || st === "play" ? f % 2 : (st === "idle" || st === "eat") ? (f >> 2) % 2 : 0;
+      const i = H - 1, wag = st === "happy" || st === "play" ? f % 2 : (st === "idle" || st === "eat") ? (f >> 2) % 2 : 0;
       behind(cells(T.tail[pet.tail][wag], R(i), top + i, false));
     }
     const ear = T.ear[pet.ears];
@@ -272,7 +272,7 @@
     }
     /* a sleep bubble from the nose grows and pops */
     if (st === "sleep"){
-      const t = (f >> 1) % 8, r = [0, 1, 1, 2, 2, 2, 0, 0][t], bx = 17 + sway + r, by = my - r;
+      const t = (f >> 1) % 8, r = [0, 1, 1, 2, 2, 2, 0, 0][t], mw = (T.mouth[mouth] || T.mouth.flat)[0].length, bx = 16 + mw / 2 + sway + r, by = my + 1;
       if (r === 1){ put(bx, by, "#CFE8FF"); }
       if (r >= 2) for (let a = -r + 1; a < r; a++) for (let b = -r + 1; b < r; b++) if (Math.abs(a) + Math.abs(b) <= r) put(bx + a, by + b, Math.abs(a) + Math.abs(b) === r - 1 ? "#9CC9F0" : "#DDF0FF");
       if (r >= 2) put(bx - 1, by - 1, "w");
