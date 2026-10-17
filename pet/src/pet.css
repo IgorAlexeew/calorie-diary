@@ -206,3 +206,5 @@ svg text{font-size-adjust:.5!important}
 .idLine .sceneTag{padding:0 6px}
 .idLine .streak{margin-left:auto;display:inline-flex;align-items:baseline;gap:3px}
 .idLine .streak svg{align-self:center}
+.say .fx{color:#8A8C93}
+.pmInfo dd.pmWords{color:var(--muted)}

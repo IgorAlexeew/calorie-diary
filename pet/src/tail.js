@@ -36,6 +36,7 @@ function openChat(open){
   $("#sheetShade").hidden = !open;
   $("#chatOpen").setAttribute("aria-expanded", String(open));
   if (open){ const f = $("#feed"); f.scrollTop = f.scrollHeight; renderCookChips(); }
+  else if (petPending){ const e = petPending; petPending = null; setTimeout(() => petEvent(...e), 250); }
 }
 $("#chatOpen").onclick = () => openChat(true);
 $("#chatClose").onclick = () => openChat(false);
@@ -117,6 +118,7 @@ $("#petMenuBtn").onclick = () => {
     ["Ветка", br ? `${BRANCH_RU[br][0]}: ${BRANCH_RU[br][1]}` : "появится с 7 дней"], ["Опыт", `${petXp()}, уровень ${petLevel(petXp())}`],
     ["Поколение", String(pet.gen || 1)]] : [["Яйцо", "вылупится после первой записи еды"]];
   const dl = el("dl",{class:"pmInfo"}); for (const [a, b] of rows) dl.append(el("dt",{text:a}), el("dd",{text:b}));
+  if (pet && petWords.length) dl.append(el("dt",{text:"Словарик"}), el("dd",{class:"pmWords", text: petWords.map(x => `${x.w} — ${x.m}`).join(", ")}));
   info.append(dl);
   $("#petMenu").hidden = false;
 };
@@ -180,7 +182,7 @@ $("#petCv").parentElement.onclick = () => {
 (() => {
   const ctx = $("#petCv").getContext("2d");
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let f = 0, lastTag = "";
+  let f = 0, lastTag = "", skyT = null;
   try { const l = JSON.parse(localStorage.getItem("petLine") || "null"); if (l && l.d === todayKey() && l.t) setLine(l.t); } catch (e) {}
   /* the top row of the pet's head when standing still, cached per look */
   let headKey = "", headVal = 4;
@@ -206,7 +208,10 @@ $("#petCv").parentElement.onclick = () => {
       /* room above the head for the speech bubble, then the pet, then the ground */
       const ground = Math.max(32, Math.min(H - 2, toLog(sp.bottom), toLog(sp.top) + Math.ceil(sayH * dpr / S) + 34 - head + 2));
       const skyTop = toLog($(".topCard").getBoundingClientRect().bottom);
-      PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop});
+      /* day and night swap through a sunset, one step every few frames */
+      const want = look.state === "sleep" || look.state === "hibernate" ? 1 : 0;
+      if (skyT === null) skyT = want; else if (skyT !== want) skyT = want > skyT ? Math.min(want, skyT + 1 / 24) : Math.max(want, skyT - 1 / 24);
+      PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop, sky: skyT});
       /* the bubble sits right above the pet's head, its tail pointing down at it */
       const hr = $("#hud").getBoundingClientRect(), headY = wr.top + (ground - 30 + head) * S / dpr - hr.top;
       const cx = wr.left + (Math.floor((W - 48) / 2) + 24) * S / dpr - hr.left;

@@ -391,33 +391,52 @@
   function icon(ctx, name, x, y, c, s){ const m = ICONS[name]; ctx.fillStyle = c; m.forEach((row, j) => [...row].forEach((v, i) => { if (v === "1") ctx.fillRect(x + i * s, y + j * s, s, s); })); }
 
   /* draws a scene: background, ground, pet, effects. Canvas is 48×40 logical px times scale */
+  /* blend two #RRGGBB colours */
+  function mix(a, b, t){
+    const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)), A = p(a), B = p(b);
+    return "#" + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, "0")).join("");
+  }
   function draw(ctx, pet, look, f, opts){
     opts = opts || {};
     const S = opts.scale || 4, W = opts.W || 48, H = opts.H || 40, gy = opts.ground || 34, st = look.state || "idle";
-    const night = st === "sleep" || st === "hibernate" || opts.night;
+    const night0 = st === "sleep" || st === "hibernate" || opts.night;
+    /* sky: 0 day, .5 sunset, 1 night; stepped in eighths, so day turns to night in a few pixel-flat steps, not a soft fade */
+    const q = Math.round((opts.sky != null ? opts.sky : night0 ? 1 : 0) * 8) / 8, night = q >= .5;
+    const C = (d, k, n) => q <= .5 ? mix(d, k, q * 2) : mix(k, n, (q - .5) * 2);
     ctx.imageSmoothingEnabled = false;
     /* the world fills the whole canvas: sky, far hills, ground; the pet's own 48×40 stage sits on the ground in the middle */
     const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x * S, y * S, w * S, h * S); };
-    R(0, 0, W, H, night ? "#1D2340" : (opts.bg || "#DCE8D5"));
-    R(0, Math.max(0, gy - 16), W, 16, night ? "#222A4C" : "#D2E2CB");
-    if (night){
-      /* a calm night sky: constellations spread over the whole sky, a few lone stars, a crescent moon */
-      const st0 = Math.min(Math.max(0, opts.skyTop || 0), gy - 20), sky = gy - 8 - st0, cells = Math.max(1, Math.round(W / 26)), rows = Math.max(1, Math.round(sky / 22));
-      for (let r = 0; r < rows; r++) for (let c = 0; c < cells; c++){
-        const k = r * cells + c, shape = CONST[k % CONST.length], cw = W / cells, ch = sky / rows;
-        const x0 = Math.floor(c * cw + hash(k, 21) * Math.max(1, cw - 16)), y0 = st0 + Math.floor(r * ch + 2 + hash(k, 22) * Math.max(1, ch - 12));
-        shape.forEach(([a, b], i) => { const tw = (f + i * 7 + k * 3) % 40 < 3; R(x0 + a, y0 + b, 1, 1, tw ? "#8C93B8" : i === 0 ? "#FFF8D6" : "#E8E4C4"); });
+    const st0 = Math.min(Math.max(0, opts.skyTop || 0), gy - 20), skyB = Math.max(0, gy - 16);
+    /* the sky in flat bands, darker at the top at sunset and at night */
+    const top = C("#DCE8D5", "#6E5A96", "#1A1F3A"), hor = C("#DCE8D5", "#F4A77A", "#222A4C"), bands = 6;
+    for (let i = 0; i < bands; i++){ const y0 = Math.floor(skyB * i / bands), y1 = Math.floor(skyB * (i + 1) / bands); R(0, y0, W, y1 - y0, mix(top, hor, i / (bands - 1))); }
+    R(0, skyB, W, gy - skyB, C("#D2E2CB", "#E08C78", "#222A4C"));
+    R(0, gy, W, H - gy, C("#B9CDAE", "#8FA083", "#2C3358"));
+    /* while the sky changes, the sun goes down behind the hills and the moon comes up */
+    if (q > 0 && q < .75){ const y = Math.round(st0 + 4 + (gy - 4 - st0 - 4) * Math.min(1, q / .6)), x = Math.floor(W * .22), c = mix("#FFE58A", "#FF8F5A", Math.min(1, q * 2));
+      R(x + 1, y, 3, 1, c); R(x, y + 1, 5, 3, c); R(x + 1, y + 4, 3, 1, c); }
+    if (q >= .5){
+      if (q >= .75){
+        /* a calm night sky: constellations spread over the whole sky, a few lone stars */
+        const sky = gy - 8 - st0, cells = Math.max(1, Math.round(W / 26)), rows = Math.max(1, Math.round(sky / 22)), dim = q < 1;
+        for (let r = 0; r < rows; r++) for (let c = 0; c < cells; c++){
+          const k = r * cells + c, shape = CONST[k % CONST.length], cw = W / cells, ch = sky / rows;
+          const x0 = Math.floor(c * cw + hash(k, 21) * Math.max(1, cw - 16)), y0 = st0 + Math.floor(r * ch + 2 + hash(k, 22) * Math.max(1, ch - 12));
+          shape.forEach(([a, b], i) => { const tw = (f + i * 7 + k * 3) % 40 < 3; R(x0 + a, y0 + b, 1, 1, tw || dim ? "#8C93B8" : i === 0 ? "#FFF8D6" : "#E8E4C4"); });
+        }
+        for (let k = 0; k < W * sky / 500; k++){ const x = Math.floor(hash(k, 7) * W), y = st0 + Math.floor(hash(k, 9) * sky); if ((f + k * 5) % 30 > 4) R(x, y, 1, 1, "#5E6694"); }
       }
-      for (let k = 0; k < W * sky / 500; k++){ const x = Math.floor(hash(k, 7) * W), y = st0 + Math.floor(hash(k, 9) * sky); if ((f + k * 5) % 30 > 4) R(x, y, 1, 1, "#5E6694"); }
-      const mx = W - 9, my = st0 + 3; [[1,0],[2,0],[3,0],[0,1],[1,1],[0,2],[1,2],[0,3],[1,3],[1,4],[2,4],[3,4]].forEach(([a, b]) => R(mx + a, my + b, 1, 1, "#F4EBC2"));
+      const mx = W - 9, my = Math.round(st0 + 3 + (gy - 8 - st0 - 3) * (1 - (q - .5) * 2));
+      [[1,0],[2,0],[3,0],[0,1],[1,1],[0,2],[1,2],[0,3],[1,3],[1,4],[2,4],[3,4]].forEach(([a, b]) => R(mx + a, my + b, 1, 1, "#F4EBC2"));
     }
     else for (let k = 0; k < Math.max(2, gy / 12); k++){
-      const c0 = Math.min(Math.max(0, opts.skyTop || 0), gy - 20), y = c0 + 3 + Math.floor(hash(k, 3) * (gy - 14 - c0)), len = 5 + Math.floor(hash(k, 4) * 5), x = ((Math.floor(hash(k, 5) * W) + (f >> 2)) % (W + 14)) - 10;
-      R(x, y, len, 1, "rgba(255,255,255,.75)"); R(x + 1, y - 1, len - 3, 1, "rgba(255,255,255,.75)");
+      const y = st0 + 3 + Math.floor(hash(k, 3) * (gy - 14 - st0)), len = 5 + Math.floor(hash(k, 4) * 5), x = ((Math.floor(hash(k, 5) * W) + (f >> 2)) % (W + 14)) - 10, cl = q ? "rgba(255,214,196,.8)" : "rgba(255,255,255,.75)";
+      R(x, y, len, 1, cl); R(x + 1, y - 1, len - 3, 1, cl);
     }
-    for (let x = 0; x < W; x++){ const h = 3 + Math.round(2 * Math.sin(x / 7) + Math.sin(x / 3 + 1)); R(x, gy - h, 1, h, night ? "#28305A" : "#C3D6BA"); }
-    R(0, gy, W, H - gy, night ? "#2C3358" : "#B9CDAE");
-    for (let y = gy + 1, r = 0; y < H; y += 4, r++) for (let x = (r % 2) * 2; x < W; x += 4) R(x, y, 1, 1, night ? "#3A4370" : "#A3BC96");
+    for (let x = 0; x < W; x++){ const h = 3 + Math.round(2 * Math.sin(x / 7) + Math.sin(x / 3 + 1)); R(x, gy - h, 1, h, C("#C3D6BA", "#8E5C78", "#28305A")); }
+    R(0, gy, W, H - gy, C("#B9CDAE", "#8FA083", "#2C3358"));
+    const dot = C("#A3BC96", "#7C8C70", "#3A4370");
+    for (let y = gy + 1, r = 0; y < H; y += 4, r++) for (let x = (r % 2) * 2; x < W; x += 4) R(x, y, 1, 1, dot);
     if (st === "hibernate"){
       /* winter outside: falling snow and a snowdrift */
       for (let k = 0; k < W * H / 140; k++){ const x = Math.floor(hash(k, 1) * W), y = (f + Math.floor(hash(k, 2) * H)) % H; R((x + (y >> 3)) % W, y, 1, 1, "#FFFFFF"); }
