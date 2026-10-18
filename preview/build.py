@@ -1,0 +1,31 @@
+"""Web preview of the pixel Android app: python3 preview/build.py [OUT] (default preview/out/index.html).
+The same page the APK ships (pet/ -> build_html.py --pet -> native.js), with native-stub.js in place of the
+Android bridge and the Handjet fonts inlined, so it opens as one HTML file in a browser or as a claude.ai Artifact."""
+import base64, os, subprocess, sys, tempfile
+here = os.path.dirname(os.path.abspath(__file__)); root = os.path.dirname(here)
+out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(here, "out", "index.html")
+rd = lambda p: open(os.path.join(root, p), encoding="utf-8").read()
+subprocess.run([sys.executable, os.path.join(root, "pet", "build.py")], check=True)
+with tempfile.TemporaryDirectory() as t:
+    subprocess.run([sys.executable, os.path.join(root, "build_html.py"), os.path.join(root, "pet", "index.html"), os.path.join(t, "index.html"), "--pet"], check=True)
+    s = open(os.path.join(t, "index.html"), encoding="utf-8").read()
+for f in ["handjet-cyrillic", "handjet-latin"]:
+    b = base64.b64encode(open(os.path.join(root, "flavors", "pet", "assets", "fonts", f + ".woff2"), "rb").read()).decode()
+    assert s.count(f"url(fonts/{f}.woff2)") == 1
+    s = s.replace(f"url(fonts/{f}.woff2)", f"url(data:font/woff2;base64,{b})")
+try: rev = subprocess.run(["git", "-C", root, "log", "-1", "--format=%h %cd", "--date=format:%d.%m %H:%M"], capture_output=True, text=True).stdout.strip()
+except Exception: rev = ""
+badge = ('<div id="pvBadge" style="position:fixed;left:50%;transform:translateX(-50%);top:env(safe-area-inset-top,0px);z-index:9999;'
+         'font:11px/1.3 monospace;background:rgba(0,0,0,.6);color:#fff;padding:1px 6px;border-radius:0 0 4px 4px;opacity:.75;pointer-events:none;white-space:nowrap">'
+         'превью ' + rev.split()[0] + '</div>')
+tag = '<script src="native.js"></script>'
+assert s.count(tag) == 1
+s = s.replace(tag, "<script>\n" + rd("preview/native-stub.js") + "</script><script>\n" + rd("assets/native.js") + "</script>")
+# the app's own runtime under its own name, so the claude.ai runtime (window.claude, used by the stub for AI) is never replaced
+for old, n in [("window.claude = {use:", 1), ("if (!window.claude || !window.claude.use)", 1), ('[claude.use("db"), claude.use("sample")]', 1)]:
+    assert s.count(old) == n, old
+    s = s.replace(old, old.replace("window.claude", "window.__app").replace("claude.use", "__app.use"))
+s = s.replace("</body>", badge + "</body>", 1)
+os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+open(out, "w", encoding="utf-8").write(s)
+print("preview", out, len(s))
