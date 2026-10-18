@@ -146,6 +146,221 @@
 
   window.claude = {use: async name => name === "db" ? db : name === "sample" ? sample : null};
 
+  /* ---------- voice (pixel version): recording -> 16 kHz mono WAV -> Gemini on odirouter -> text ---------- */
+  async function toWav(blob){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ac = new AC();
+    let buf;
+    try { buf = await ac.decodeAudioData(await blob.arrayBuffer()); } finally { try { ac.close(); } catch (e) {} }
+    const rate = 16000, len = Math.max(1, Math.ceil(buf.duration * rate));
+    const off = new OfflineAudioContext(1, len, rate);
+    const src = off.createBufferSource(); src.buffer = buf; src.connect(off.destination); src.start();
+    const pcm = (await off.startRendering()).getChannelData(0);
+    const out = new DataView(new ArrayBuffer(44 + pcm.length * 2));
+    const w = (o, t) => { for (let i = 0; i < t.length; i++) out.setUint8(o + i, t.charCodeAt(i)); };
+    w(0, "RIFF"); out.setUint32(4, 36 + pcm.length * 2, true); w(8, "WAVE"); w(12, "fmt ");
+    out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
+    out.setUint32(24, rate, true); out.setUint32(28, rate * 2, true); out.setUint16(32, 2, true); out.setUint16(34, 16, true);
+    w(36, "data"); out.setUint32(40, pcm.length * 2, true);
+    for (let i = 0; i < pcm.length; i++){ const v = Math.max(-1, Math.min(1, pcm[i])); out.setInt16(44 + i * 2, v < 0 ? v * 0x8000 : v * 0x7fff, true); }
+    const bytes = new Uint8Array(out.buffer); let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+  /* the audio model comes from the build; without one, the first free Gemini model odirouter lists (remembered) */
+  let audioModel = null;
+  async function pickAudioModel(){
+    if (audioModel) return audioModel;
+    const c = cfg();
+    if (c.audioModel) return audioModel = c.audioModel;
+    try { const m = localStorage.getItem("audioModel"); if (m) return audioModel = m; } catch (e) {}
+    const ids = ((JSON.parse(await call("models")) || {}).data || []).map(m => m.id).filter(Boolean);
+    const rank = id => (/free/i.test(id) ? 0 : 4) + (/flash/i.test(id) ? 0 : 2) + (/lite|image|tts|embed/i.test(id) ? 1 : 0);
+    const gem = ids.filter(id => /gemini/i.test(id) && !/tts|embed|image/i.test(id)).sort((a, b) => rank(a) - rank(b));
+    if (!gem.length) throw {code:"bad_model", message:"нет модели Gemini для голоса"};
+    audioModel = gem[0];
+    try { localStorage.setItem("audioModel", audioModel); } catch (e) {}
+    return audioModel;
+  }
+  window.__transcribe = async blob => {
+    if (!cfg().hasKey) throw {code:"no_key"};
+    const [data, model] = await Promise.all([toWav(blob), pickAudioModel()]);
+    const body = {model, max_tokens: 1024, messages: [{role:"user", content: [
+      {type:"text", text:"Это голосовое сообщение для дневника питания на русском. Запиши дословно, что сказано, обычным текстом, без пояснений и кавычек. Если к сообщению не приложен звук, ответь ровно NO_AUDIO. Если звук есть, но речи в нём не слышно, ответь ровно NO_SPEECH. Ничего не придумывай."},
+      {type:"input_audio", input_audio:{data, format:"wav"}}
+    ]}]};
+    let raw;
+    try { raw = await call("chat", body, false); }
+    catch (e) { if (e && e.code === "bad_model" && !cfg().audioModel){ audioModel = null; try { localStorage.removeItem("audioModel"); } catch (x) {} } throw e; }
+    const msg = ((JSON.parse(raw) || {}).choices || [])[0];
+    let t = msg && msg.message && msg.message.content;
+    if (Array.isArray(t)) t = t.map(p => p.text || "").join("");
+    t = String(t || "").trim().replace(/^["«]|["»]$/g, "");
+    if (/^NO_AUDIO\b/.test(t)) throw {code:"no_audio", model};
+    if (/^NO_SPEECH\b/.test(t)) return "";
+    return t;
+  };
+  window.__transcribe.model = () => audioModel || cfg().audioModel || "";
+
+  /* ---------- hold-to-talk (pixel version) ----------
+     The mic buttons record while held and send on release; sliding far off the button cancels.
+     Engines: "phone" = Android speech recognition through Native.sr*, "gemini" = recording + __transcribe.
+     While held, the button shows pixel level bars and the chat bar shows what is heard. */
+  const VOICE_KEY = "voiceEngine", DIAG_KEY = "voiceDiag";
+  const lsGet = (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+  const voiceEngine = () => lsGet(VOICE_KEY, "phone");
+  const SR_ERR = {"1":"нет сети","2":"нет сети","3":"микрофон занят","4":"сервер распознавания не ответил","5":"сбой распознавания","8":"распознавание занято, попробуй ещё раз","9":"нет доступа к микрофону",
+    permission:"нет доступа к микрофону, разреши его в настройках телефона", unavailable:"на телефоне нет распознавания речи, переключи голос на ИИ в настройках", start:"распознавание не запустилось"};
+  let hold = null;
+  const pct = v => Math.round(v * 100) + "%";
+  function voiceSay(t, err){
+    const p = document.getElementById("chatPrev");
+    if (p){ p.textContent = t; p.classList.toggle("busy", !err); }
+    if (typeof setStatus === "function") setStatus(t, err);
+  }
+  function setLevel(v){
+    if (!hold) return;
+    hold.peak = Math.max(hold.peak, v);
+    const h = hold.btn.clientHeight - 14, prof = [.45, .75, 1, .75, .45];
+    hold.bars.forEach((b, i) => {
+      const x = Math.min(1, v * prof[i] * (0.8 + Math.random() * 0.4));
+      b.style.height = Math.max(4, Math.round(x * h / 4) * 4) + "px";
+    });
+  }
+  function endHold(){
+    if (!hold) return null;
+    const h = hold; hold = null;
+    h.btn.classList.remove("holding", "rec");
+    h.bars.forEach(b => b.style.height = "4px");
+    if (h.timer) clearTimeout(h.timer);
+    return h;
+  }
+  function voiceDone(h, text, diag){
+    if (diag) lsSet(DIAG_KEY, diag);
+    text = (text || "").trim();
+    if (!text){
+      const short = h && h.dur != null && h.dur < 700;
+      voiceSay(short ? "Держи кнопку, пока говоришь, и отпусти в конце." : "Не расслышал. " + (diag || ""), true);
+      return;
+    }
+    voiceSay("");
+    if (typeof openChat === "function") openChat(true);
+    if (typeof sendChat === "function") sendChat(text, true);
+  }
+  /* phone engine: Java SpeechRecognizer; it may stop on a pause while the button is still held, then it is restarted */
+  window.__native.sr = (kind, v) => {
+    const h = hold && hold.engine === "phone" ? hold : null;
+    const ph = window.__phone; if (!ph) return;
+    const join = (a, b) => [a, b].filter(Boolean).join(" ");
+    if (kind === "level"){ if (h) setLevel(+v); }
+    else if (kind === "granted"){ if (h) N.srStart(); }
+    else if (kind === "partial"){ ph.partial = v; if (h) voiceSay(join(ph.text, v) || "Слушаю…"); }
+    else if (kind === "final"){
+      ph.text = join(ph.text, v || ph.partial); ph.partial = "";
+      if (h){ N.srStart(); voiceSay(ph.text || "Слушаю…"); }
+      else if (!ph.done){ ph.done = true; voiceDone(ph.h, ph.text, `Телефон: «${ph.text.slice(0, 60)}»`); }
+    } else if (kind === "error"){
+      const quiet = v === "6" || v === "7";
+      if (h && quiet){ N.srStart(); return; }
+      if (h && !quiet){ endHold(); }
+      if (ph.done) return;
+      ph.done = true;
+      const text = join(ph.text, ph.partial);
+      if (text || quiet || (v === "5" && !h)) voiceDone(ph.h, text, `Телефон: ${quiet ? "речь не распознана" : "ошибка " + v}`);
+      else { voiceSay("Голос не сработал: " + (SR_ERR[v] || "ошибка " + v) + ".", true); lsSet(DIAG_KEY, "Телефон: ошибка " + v); }
+    }
+  };
+  function phoneStart(h){
+    window.__phone = {h, text:"", partial:"", done:false};
+    N.srStart();
+  }
+  function phoneStop(h, send){
+    const ph = window.__phone;
+    if (!send){ N.srCancel(); if (ph) ph.done = true; return; }
+    N.srStop();
+    /* if the recognizer goes quiet after release, send what was heard */
+    setTimeout(() => { if (ph && !ph.done){ ph.done = true; voiceDone(h, [ph.text, ph.partial].filter(Boolean).join(" "), "Телефон: нет финального ответа"); } }, 4000);
+  }
+  /* gemini engine: MediaRecorder + level meter, then __transcribe */
+  async function geminiStart(h){
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({audio: true}); }
+    catch (e) { if (hold === h) endHold(); voiceSay("Нет доступа к микрофону. Разреши его в настройках телефона.", true); return; }
+    if (hold !== h){ stream.getTracks().forEach(t => t.stop()); return; }
+    const AC = window.AudioContext || window.webkitAudioContext, ac = new AC();
+    const an = ac.createAnalyser(); an.fftSize = 1024; ac.createMediaStreamSource(stream).connect(an);
+    const buf = new Float32Array(an.fftSize);
+    const tick = () => { if (hold !== h) return; an.getFloatTimeDomainData(buf); let sum = 0; for (const x of buf) sum += x * x; setLevel(Math.min(1, Math.sqrt(sum / buf.length) * 5)); requestAnimationFrame(tick); };
+    const mr = new MediaRecorder(stream), chunks = [];
+    mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    h.rec = {stream, ac, mr, chunks};
+    mr.start(); tick();
+  }
+  function geminiStop(h, send){
+    const r = h.rec;
+    if (!r){ if (send) voiceDone(h, "", ""); return; }
+    r.mr.onstop = async () => {
+      r.stream.getTracks().forEach(t => t.stop()); try { r.ac.close(); } catch (e) {}
+      if (!send) return;
+      const blob = new Blob(r.chunks, {type: r.mr.mimeType || "audio/webm"});
+      const info = `запись ${(h.dur / 1000).toFixed(1)} с, громкость ${pct(h.peak)}`;
+      if (h.dur < 700) return voiceDone(h, "", "");
+      if (h.peak < 0.04) return voiceSay(`Микрофон ничего не услышал (${info}).`, true), lsSet(DIAG_KEY, "ИИ: тишина, " + info);
+      voiceSay("Распознаю голос…");
+      try {
+        const t = await window.__transcribe(blob);
+        voiceDone(h, t, `ИИ ${window.__transcribe.model()}: ${info}${t ? ", «" + t.slice(0, 60) + "»" : ", речи не нашёл"}`);
+      } catch (e) {
+        const m = window.__transcribe.model();
+        if (e && e.code === "no_audio"){ voiceSay(`Модель ${m} не получила звук: odirouter, похоже, не передаёт ей аудио. Переключи голос на «Телефон» в настройках.`, true); lsSet(DIAG_KEY, `ИИ ${m}: модель не получила звук, ${info}`); }
+        else { const d = (e && (e.message || e.code)) || "ошибка"; voiceSay("Не получилось распознать голос: " + d, true); lsSet(DIAG_KEY, `ИИ ${m}: ${d}, ${info}`); }
+      }
+    };
+    r.mr.stop();
+  }
+  function voiceDown(btn, e){
+    if (hold || (typeof chatBusy !== "undefined" && chatBusy)) return;
+    e.preventDefault();
+    try { btn.setPointerCapture(e.pointerId); } catch (x) {}
+    const engine = voiceEngine();
+    hold = {btn, engine, t0: Date.now(), x: e.clientX, y: e.clientY, peak: 0, bars: Array.from(btn.querySelectorAll(".vu i"))};
+    btn.classList.add("holding", "rec");
+    if (navigator.vibrate) try { navigator.vibrate(15); } catch (x) {}
+    voiceSay("Слушаю… отпусти, чтобы отправить");
+    hold.timer = setTimeout(() => voiceUp(btn, null), 120000);
+    if (engine === "phone") phoneStart(hold); else geminiStart(hold);
+  }
+  function voiceUp(btn, e){
+    if (!hold || hold.btn !== btn) return;
+    const cancel = e && (e.type === "pointercancel" || Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 90);
+    const h = endHold(); h.dur = Date.now() - h.t0;
+    if (cancel) voiceSay("Запись отменена.");
+    else if (h.engine === "phone") voiceSay("Распознаю…");
+    if (h.engine === "phone") phoneStop(h, !cancel); else geminiStop(h, !cancel);
+  }
+  function setupVoice(){
+    const btns = ["barMic", "micBtn"].map(id => document.getElementById(id)).filter(Boolean);
+    if (!btns.length) return;
+    const st = document.createElement("style");
+    st.textContent = `.pxBtn.mic{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.pxBtn.mic .vu{position:absolute;inset:0;display:none;align-items:center;justify-content:center;gap:3px;background:var(--over);pointer-events:none}
+.pxBtn.mic.holding{animation:none;background:var(--over)}
+.pxBtn.mic.holding .vu{display:flex}
+.pxBtn.mic .vu i{display:block;width:4px;height:4px;background:#fff}`;
+    document.head.append(st);
+    for (const b of btns){
+      b.onclick = null;
+      b.setAttribute("aria-label", "Держи, чтобы записать голосовое");
+      const vu = document.createElement("span"); vu.className = "vu"; vu.setAttribute("aria-hidden", "true");
+      vu.innerHTML = "<i></i><i></i><i></i><i></i><i></i>"; b.append(vu);
+      b.addEventListener("pointerdown", e => voiceDown(b, e));
+      b.addEventListener("pointerup", e => voiceUp(b, e));
+      b.addEventListener("pointercancel", e => voiceUp(b, e));
+      b.addEventListener("contextmenu", e => e.preventDefault());
+    }
+  }
+
   /* ---------- settings sheet ---------- */
   const css = `
 .gear{border:1px solid var(--line);background:var(--surface);border-radius:8px;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);padding:0}
@@ -166,6 +381,7 @@
   const st = document.createElement("style"); st.textContent = css; document.head.append(st);
 
   let sheet = null;
+  const PET = () => !!document.getElementById("petScreen");
   const esc = t => String(t || "").replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
   const MEALS = ["Завтрак", "Обед", "Перекус", "Ужин"];
   const hm = r => String(r.h).padStart(2, "0") + ":" + String(r.m).padStart(2, "0");
@@ -191,7 +407,7 @@
     if (sheet) return;
     const c = cfg();
     const back = document.createElement("div"); back.className = "sheetBack";
-    back.innerHTML = `<div class="sheet" role="dialog" aria-label="Настройки">
+    back.innerHTML = `<div class="sheet${PET() ? " px" : ""}" role="dialog" aria-label="Настройки">
       <div id="sAi" style="display:flex;flex-direction:column;gap:12px"${c.builtIn ? " hidden" : ""}>
       <h2>Настройки ИИ</h2>
       <label class="field">Ключ odirouter<input id="sKey" type="password" autocomplete="off" placeholder="${c.hasKey ? "Ключ сохранён, введи новый, чтобы заменить" : "Вставь ключ"}"></label>
@@ -203,6 +419,12 @@
       <div class="row2"><button type="button" class="primary" id="sSave">Сохранить</button></div>
       <div class="sep"></div>
       </div>
+      ${PET() ? `<h2>Голос</h2>
+      <p class="hint">Держи кнопку микрофона, пока говоришь. Отпусти, чтобы отправить, или уведи палец в сторону, чтобы отменить.</p>
+      <label class="rem"><input type="radio" name="sVoice" value="phone"${voiceEngine() === "phone" ? " checked" : ""}> Телефон: распознавание Android, без лимита</label>
+      <label class="rem"><input type="radio" name="sVoice" value="gemini"${voiceEngine() === "gemini" ? " checked" : ""}> ИИ: Gemini через odirouter</label>
+      <p class="hint" id="sVoiceDiag">${esc(lsGet(DIAG_KEY, "") ? "Последняя запись: " + lsGet(DIAG_KEY, "") : "")}</p>
+      <div class="sep"></div>` : ""}
       <h2>Напоминания</h2>
       <p class="hint">Приходят, только если этот приём пищи ещё не записан за сегодня.</p>
       <div id="sRems" style="display:flex;flex-direction:column;gap:8px"></div>
@@ -218,6 +440,7 @@
     document.body.append(back); sheet = back;
     const $s = id => back.querySelector("#" + id), msg = (t, err) => { const m = $s("sMsg"); m.textContent = t || ""; m.className = "msgLine" + (err ? " err" : ""); };
     renderReminders(back, c);
+    back.querySelectorAll('input[name="sVoice"]').forEach(r => r.onchange = () => { if (r.checked) lsSet(VOICE_KEY, r.value); });
     $s("sModel").value = c.model || "";
     $s("sBase").value = c.base || "";
     const close = () => { back.remove(); sheet = null; sheetRefresh = null; };
@@ -268,12 +491,22 @@
   window.__focusAdd = () => {
     const t = document.getElementById("foodText"); if (!t) return;
     if (window.__goToday) window.__goToday();
+    if (PET() && typeof window.openChat === "function"){ window.openChat(true); setTimeout(() => t.focus(), 50); return; }
     t.scrollIntoView({block: "center"}); t.focus();
   };
   window.__pushToday = o => { try { N.pushToday(JSON.stringify(o)); } catch (e) {} };
 
   document.addEventListener("DOMContentLoaded", () => {
     const top = document.querySelector(".top");
+    /* pixel version: settings live in the pet menu */
+    const pm = document.querySelector("#petMenu .modalBox");
+    if (pm){
+      const h = document.createElement("h3"); h.textContent = "Приложение";
+      const p = document.createElement("p"); p.className = "hint"; p.textContent = "Напоминания о еде и копия записей.";
+      const b = document.createElement("button"); b.type = "button"; b.className = "small"; b.textContent = "Настройки";
+      b.onclick = () => { document.getElementById("petMenu").hidden = true; openSettings(); };
+      pm.append(h, p, b);
+    }
     if (top){
       const g = document.createElement("button");
       g.type = "button"; g.className = "gear"; g.setAttribute("aria-label", "Настройки");
@@ -281,6 +514,7 @@
       g.onclick = openSettings;
       const h = top.querySelector("h1"); if (h) h.after(g); else top.append(g);
     }
+    if (PET()) setupVoice();
     if (!cfg().hasKey) setTimeout(openSettings, 300);
     if (N.takeAddRequest()) setTimeout(window.__focusAdd, 300);
   });

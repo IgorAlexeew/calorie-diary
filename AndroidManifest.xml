@@ -69,7 +69,7 @@
         </receiver>
         <provider
             android:name=".CamProvider"
-            android:authorities="app.caloriediary.cam"
+            android:authorities="${applicationId}.cam"
             android:exported="false"
             android:grantUriPermissions="true" />
     </application>

@@ -1,3 +1,5 @@
+import javax.inject.Inject
+
 plugins {
     id 'com.android.application' version '8.5.2'
 }
@@ -23,6 +25,24 @@ android {
         buildConfigField 'String', 'API_KEY', quoted(conf('ODIROUTER_API_KEY', ''))
         buildConfigField 'String', 'MODEL', quoted(conf('ODIROUTER_MODEL', 'free-vclaude-haiku-4.5'))
         buildConfigField 'String', 'API_BASE', quoted(conf('ODIROUTER_BASE', 'https://api.odirouter.ai/v1'))
+        // voice messages (pixel version): empty = the first free Gemini model odirouter lists
+        buildConfigField 'String', 'AUDIO_MODEL', quoted(conf('ODIROUTER_AUDIO_MODEL', ''))
+    }
+
+    // Two faces over the same Java code, widgets and reminders. Different applicationIds, so both apps
+    // sit on the phone side by side, each with its own diary.
+    flavorDimensions 'face'
+    productFlavors {
+        classic {
+            dimension 'face'
+            applicationId 'app.caloriediary'
+            buildConfigField 'boolean', 'PET', 'false'
+        }
+        pet {
+            dimension 'face'
+            applicationId 'app.caloriediary.pet'
+            buildConfigField 'boolean', 'PET', 'true'
+        }
     }
 
     buildFeatures { buildConfig true }
@@ -34,6 +54,12 @@ android {
             java.srcDirs = ['src']
             res.srcDirs = ['res']
             assets.srcDirs = ['assets']
+        }
+        // plus build/pet-assets/index.html, built from pet/ by petHtml below; it replaces assets/index.html
+        pet {
+            manifest.srcFile 'flavors/pet/AndroidManifest.xml'
+            res.srcDirs = ['flavors/pet/res']
+            assets.srcDirs = ['flavors/pet/assets']
         }
     }
 
@@ -65,4 +91,30 @@ android {
     }
 
     lint { checkReleaseBuilds false }
+}
+
+// The pixel page: pet/src -> pet/build.py -> build_html.py --pet -> build/pet-assets/index.html
+abstract class PetHtml extends DefaultTask {
+    @InputDirectory abstract DirectoryProperty getSources()
+    @InputFiles abstract ConfigurableFileCollection getScripts()
+    @OutputDirectory abstract DirectoryProperty getOutputDir()
+    @Inject abstract ExecOperations getExecOps()
+
+    @TaskAction
+    void build() {
+        def python = System.getenv('PYTHON') ?: 'python3'
+        def root = project.projectDir
+        execOps.exec { workingDir root; commandLine python, 'pet/build.py' }
+        execOps.exec { workingDir root; commandLine python, 'build_html.py', 'pet/index.html', outputDir.file('index.html').get().asFile.path, '--pet' }
+    }
+}
+def petHtml = tasks.register('petHtml', PetHtml) {
+    sources = layout.projectDirectory.dir('pet/src')
+    scripts.from('pet/build.py', 'build_html.py')
+    outputDir = layout.buildDirectory.dir('pet-assets')
+}
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        if (variant.flavorName == 'pet') variant.sources.assets?.addGeneratedSourceDirectory(petHtml) { it.outputDir }
+    }
 }

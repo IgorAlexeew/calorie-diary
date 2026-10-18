@@ -1,0 +1,173 @@
+<div class="app" id="app">
+  <div class="screens" id="screens" data-screen="pet">
+
+    <!-- screen 1: the pet -->
+    <main class="screen petScreen" id="petScreen" aria-label="Питомец">
+      <div class="world" id="world">
+        <canvas id="petCv" width="192" height="160" aria-label="Питомец, нажми, чтобы погладить"></canvas>
+      </div>
+      <div class="hud" id="hud">
+      <!-- top of the HUD: one block with who the pet is, what it says and the two buttons -->
+      <header class="hudTop">
+        <div class="hudCard topCard">
+        <div class="idLine">
+          <b id="petName">Яйцо</b>
+          <span class="idMeta">
+            <span id="petStage">ждёт первой записи</span>
+            <span class="sceneTag" id="sceneTag" hidden></span>
+            <span class="streak num" id="streak" hidden></span>
+          </span>
+          <span class="topBtns">
+            <button type="button" class="pxBtn" id="toDiary" aria-label="Дневник"></button>
+            <button type="button" class="pxBtn" id="petMenuBtn" aria-label="Меню питомца"></button>
+          </span>
+        </div>
+        </div>
+      </header>
+      <p class="say" id="petSay" aria-live="polite"><canvas class="sayIco" id="petSayIco" width="40" height="40" hidden aria-hidden="true"></canvas><span id="petSayText">…</span></p>
+
+      <div class="petSpace" id="petSpace" aria-hidden="true"></div>
+
+      <!-- bottom of the HUD: two folded panels, opened by the buttons above the chat -->
+      <div class="hudBottom">
+        <section class="hudCard day hudPanel" id="foodPanel" aria-label="Итог дня" hidden>
+          <div class="dayHead">
+            <span><b class="num" id="eaten">0</b> <span class="num" id="ofTarget">из 1800 ккал</span></span>
+            <span class="left num" id="left">Осталось 1800 ккал</span>
+          </div>
+          <div class="seg kcalSeg" id="kcalSeg" aria-hidden="true"></div>
+          <div class="sumPace num" id="sumPace" hidden></div>
+          <div class="sumPace num" id="stepsLine" hidden></div>
+          <div class="macros">
+            <div class="macro"><span>Белки</span><span class="num" id="pVal">0 / 140 г</span><div class="bar"><i id="pBar" style="width:0"></i></div></div>
+            <div class="macro"><span>Жиры</span><span class="num" id="fVal">0 / 60 г</span><div class="bar"><i id="fBar" style="width:0"></i></div></div>
+            <div class="macro"><span>Углеводы</span><span class="num" id="cVal">0 / 175 г</span><div class="bar"><i id="cBar" style="width:0"></i></div></div>
+          </div>
+        </section>
+        <section class="hudCard hudPanel" id="statsPanel" aria-label="Состояние питомца" hidden>
+          <div class="stats" id="petStats"></div>
+          <div class="goal" id="goalLine" hidden>
+            <span class="goalLab" id="goalLab"></span>
+            <div class="seg goalSeg" id="goalSeg" aria-hidden="true"></div>
+          </div>
+        </section>
+        <div class="hudToggles">
+          <button type="button" class="hudTgl" id="tglFood" aria-controls="foodPanel" aria-expanded="false"><span class="ico" id="tglFoodIco"></span><span class="num" id="tglFoodLab">Еда</span></button>
+          <button type="button" class="hudTgl" id="tglStats" aria-controls="statsPanel" aria-expanded="false"><span class="num" id="tglStatsLab">Состояние</span><span class="ico" id="tglStatsIco"></span></button>
+        </div>
+      </div>
+      <div id="notice" class="notice" hidden></div>
+      </div>
+    </main>
+
+    <!-- screen 2: the diary -->
+    <main class="screen diaryScreen" id="diaryScreen" aria-label="Дневник" role="dialog" aria-modal="true" inert>
+      <div class="diaryBox" id="diaryBox">
+      <header class="diaryTop">
+        <h1>Дневник</h1>
+        <button type="button" class="pxBtn close" id="toPet" aria-label="Закрыть дневник"></button>
+        <div class="datenav">
+          <button id="prev" type="button" aria-label="Предыдущий день"></button>
+          <span id="dateLabel">Сегодня</span>
+          <button id="next" type="button" aria-label="Следующий день"></button>
+        </div>
+      </header>
+      <p class="dTotal num" id="dTotal"></p>
+
+      <section class="panel" aria-label="Записи за день">
+        <div id="log"><p class="empty">Загружаю записи…</p></div>
+      </section>
+
+      <section class="panel week stack">
+        <h2>Последние 7 дней</h2>
+        <div id="week"></div>
+      </section>
+
+      <section class="panel stack" aria-label="Темп похудения">
+        <h2>Темп</h2>
+        <div class="pace">
+          <div><div class="paceBig num" id="paceW">—</div><p class="hint">по взвешиваниям, тренд за 4 недели</p></div>
+          <div><div class="paceBig num" id="paceK">—</div><p class="hint" id="paceKNote">по калориям</p></div>
+        </div>
+        <p class="forecast" id="forecast"></p>
+        <p class="hint" id="paceTrend"></p>
+        <div id="wChart"></div>
+      </section>
+
+      <div class="two">
+        <section class="panel stack">
+          <h2>Вес</h2>
+          <form id="weightForm" class="row">
+            <input id="weightIn" type="number" step="0.1" min="30" max="300" inputmode="decimal" placeholder="кг" aria-label="Вес в килограммах" class="pxInput">
+            <button class="small" type="submit">Записать</button>
+          </form>
+          <p class="hint" id="weightSummary">Взвешивайся раз в неделю утром натощак.</p>
+          <ul class="weights" id="weightList"></ul>
+        </section>
+        <section class="panel stack">
+          <h2>Норма</h2>
+          <label class="field">Калории в день<input id="tKcal" type="number" min="1200" max="4000" step="50"></label>
+          <label class="field">Белок, г<input id="tProt" type="number" min="40" max="300" step="5"></label>
+          <label class="field">Цель по весу, кг<input id="tGoal" type="number" min="40" max="200" step="1"></label>
+          <p class="hint">Жиры и углеводы считаются от калорий: ~30% и остаток.</p>
+        </section>
+      </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- chat: a bar at the bottom that opens into a sheet -->
+  <div class="sheetShade" id="sheetShade" hidden></div>
+  <section class="chatSheet" id="chatSheet" data-open="false" aria-label="Чат дневника">
+    <div class="chatBar" id="chatBar">
+      <button type="button" class="chatOpen" id="chatOpen" aria-expanded="false" aria-controls="chatBody">
+        <span class="chatIco" id="chatIco"></span>
+        <span class="chatPrev" id="chatPrev">Напиши или скажи, что съел</span>
+      </button>
+      <button type="button" class="pxBtn mic" id="barMic" aria-label="Голосовое сообщение"></button>
+    </div>
+    <div class="chatBody chatPanel" id="chatBody">
+      <div class="chatHead">
+        <h2>Чат</h2>
+        <span class="hint" id="cookCtx"></span>
+        <button type="button" class="clearBtn" id="clearChat" hidden>Очистить</button>
+        <button type="button" class="pxBtn" id="chatClose" aria-label="Свернуть чат"></button>
+      </div>
+      <div class="feed" id="feed" aria-live="polite"></div>
+      <div class="chips" id="cookChips"></div>
+      <form id="addForm">
+        <div class="composer" id="composer">
+          <textarea id="foodText" placeholder="Что съел, что поесть, шаги или вес" aria-label="Сообщение"></textarea>
+          <div class="thumbs" id="thumbs" hidden></div>
+          <div class="composerFoot">
+            <button type="button" class="attach" id="attachBtn" hidden aria-label="Прикрепить фото"><span id="attachIco"></span><span>Фото</span></button>
+            <span class="hint" id="photoCount"></span>
+            <button type="button" class="pxBtn mic" id="micBtn" aria-label="Голосовое сообщение"></button>
+            <button type="submit" class="sendBtn" id="addBtn" aria-label="Отправить"></button>
+          </div>
+          <input id="photoIn" type="file" accept="image/*" multiple hidden>
+        </div>
+      </form>
+      <p class="status" id="status" role="status"></p>
+    </div>
+  </section>
+
+  <!-- pet menu -->
+  <div class="modal" id="petMenu" hidden role="dialog" aria-modal="true" aria-labelledby="pmTitle">
+    <div class="modalBox px">
+      <div class="modalHead"><h2 id="pmTitle">Питомец</h2><button type="button" class="pxBtn" id="pmClose" aria-label="Закрыть"></button></div>
+      <div class="pmInfo" id="pmInfo"></div>
+      <h3>Просмотр</h3>
+      <p class="hint">Состояние, возраст и время суток сочетаются как угодно. «Как сейчас» возвращает настоящее.</p>
+      <h4>Состояние</h4>
+      <div class="pmDemo" id="pmDemo"></div>
+      <h4>Возраст и ветка</h4>
+      <div class="pmDemo" id="pmAge"></div>
+      <h4>Время суток</h4>
+      <div class="pmDemo" id="pmTime"></div>
+      <h3>Переродить</h3>
+      <p class="hint">Зверёк вернётся в яйцо, и ИИ соберёт нового. Записи дневника останутся.</p>
+      <button type="button" class="small danger" id="pmReroll">Переродить зверька</button>
+    </div>
+  </div>
+</div>

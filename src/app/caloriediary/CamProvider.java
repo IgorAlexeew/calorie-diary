@@ -14,7 +14,8 @@ import java.io.FileNotFoundException;
 
 /* Serves camera shots from the app cache so the camera app can write them and the WebView can read them. */
 public class CamProvider extends ContentProvider {
-    static final String AUTHORITY = "app.caloriediary.cam";
+    /* ${applicationId}.cam in the manifest: the classic and pixel apps each have their own */
+    static String authority(Context c) { return c.getPackageName() + ".cam"; }
 
     static File dir(Context c) {
         File d = new File(c.getCacheDir(), "camera");
@@ -26,7 +27,7 @@ public class CamProvider extends ContentProvider {
         File[] old = dir(c).listFiles();
         long now = System.currentTimeMillis();
         if (old != null) for (File f : old) if (now - f.lastModified() > 86400000L) f.delete();
-        return Uri.parse("content://" + AUTHORITY + "/shot_" + now + ".jpg");
+        return Uri.parse("content://" + authority(c) + "/shot_" + now + ".jpg");
     }
 
     static boolean hasPhoto(Context c, Uri u) {
