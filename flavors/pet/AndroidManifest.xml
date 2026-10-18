@@ -4,4 +4,8 @@
     <!-- voice messages -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- the phone's speech recognition service has to be visible to the app (Android 11+) -->
+    <queries>
+        <intent><action android:name="android.speech.RecognitionService" /></intent>
+    </queries>
 </manifest>

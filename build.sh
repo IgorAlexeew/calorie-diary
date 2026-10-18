@@ -20,6 +20,7 @@ sed -e 's|<manifest xmlns:android="http://schemas.android.com/apk/res/android">|
 mkdir -p "$O/assets" && cp -r "$A/assets/." "$O/assets/"
 if [ "$FLAVOR" = pet ]; then
   sed -i "s|<uses-permission android:name=\"android.permission.INTERNET\" />|&\n$(grep -o '<uses-permission[^>]*>' "$A/flavors/pet/AndroidManifest.xml" | tr '\n' ' ')|" "$O/AndroidManifest.xml"
+  sed -i 's|<intent><action android:name="android.media.action.IMAGE_CAPTURE" /></intent>|&<intent><action android:name="android.speech.RecognitionService" /></intent>|' "$O/AndroidManifest.xml"
   cp -r "$A/flavors/pet/assets/." "$O/assets/"
   python3 "$A/pet/build.py" >/dev/null && python3 "$A/build_html.py" "$A/pet/index.html" "$O/assets/index.html" --pet >/dev/null
 fi
