@@ -36,7 +36,7 @@
 
 ## Сборка
 
-**GitHub Actions** (`.github/workflows/apk.yml`): каждый пуш в `main` или `develop` собирает оба подписанных APK (`calorie-diary-…` и `pixel-diary-…`) и выкладывает их в релиз (из `develop` с префиксом `dev-`). PR в эти ветки собирает оба APK в артефакты запуска, без релиза. Нужны:
+**GitHub Actions** (`.github/workflows/apk.yml`): каждый пуш в `main` или `develop` собирает оба подписанных APK (`calorie-diary-…` и `pixel-diary-…`) и выкладывает их в релиз (из `develop` с префиксом `dev-`). PR в эти ветки собирает оба APK в пре-релиз `pr-<номер PR>` (обычные APK, не zip; пересобирается при каждом пуше) и в артефакты запуска. Нужны:
 
 - секреты `ODIROUTER_API_KEY`, `SIGNING_KEYSTORE_BASE64` (`base64 -w0 release.p12`), `SIGNING_PASSWORD`;
 - переменные `ODIROUTER_MODEL` и `ODIROUTER_AUDIO_MODEL`, если нужны не модели по умолчанию.

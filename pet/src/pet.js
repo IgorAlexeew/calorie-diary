@@ -138,6 +138,19 @@ function petEvent(state, ms, food){
   if (state === "eat" && Date.now() - lineAt > 60000) setLine(localLine(petStatsNow || petStats(), "eat"));
 }
 
+/* the pet listens while the voice button is held: the Android app (native.js) calls
+   __petListen(true, level 0..1) while recording and __petListen(false) on release */
+let petListening = null;
+window.__petListen = (on, level) => {
+  const box = $("#petSayText");
+  if (on){
+    if (!petListening) petListening = {saved: Array.from(box.childNodes, n => n.cloneNode(true)), level: 0};
+    petListening.level = level || 0;
+    const n = 1 + Math.round(petListening.level * 4);
+    box.replaceChildren(el("span",{class:"fx", text: "(" + "•".repeat(n) + ")"}));
+  } else if (petListening){ box.replaceChildren(...petListening.saved); petListening = null; }
+};
+
 /* ---------- lines written by the AI ---------- */
 let lineAt = 0, lineBusy = false, lineKey = "";
 function setLine(t, loading){
@@ -434,5 +447,6 @@ function petLook(){
   /* a menu preview eats in a loop; a real meal once */
   if (ev && ev.food){ look.food = ev.food; look.eatT = ev.loop ? ((now - ev.start) % ev.dur) / ev.dur : 1 - (ev.until - now) / (ev.dur || 4500); }
   if (petLookDemo) Object.assign(look, petLookDemo);
+  if (petListening){ look.state = "listen"; look.listen = petListening.level; }
   return {pet, look};
 }
