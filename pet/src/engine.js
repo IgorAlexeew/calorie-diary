@@ -192,7 +192,7 @@
       /* each ear stands on the head surface at a fixed distance from the middle, so they never fuse */
       const w = ear.rows[0].length, d = {bunny: 2, horns: 2, cat: Math.max(2, hw[1] - 2), bear: Math.max(2, hw[1] - 2)}[pet.ears];
       for (const s of [-1, 1]){
-        const twitch = (st === "idle" && s > 0 && f % 24 < 2) || ((st === "happy" || st === "play") && f % 2) ? -1 : 0;
+        const twitch = st === "listen" || (st === "idle" && s > 0 && f % 24 < 2) || ((st === "happy" || st === "play") && f % 2) ? -1 : 0;
         const droop = st === "sad" || st === "sick" || lying ? 1 : 0;
         const inner = 15 - d + sway, x = s < 0 ? inner - (w - 1 - ear.px) : MIR(inner - (w - 1 - ear.px)) + 2 * sway;
         let ty = top; while (ty < bot && !body[ty][Math.max(0, Math.min(G - 1, x))]) ty++;
@@ -270,7 +270,7 @@
 
     /* the face sits at a fixed spot on the head */
     const ei = rowAt(baby ? 4 : 4 + Math.floor((H - 11) / 3)), eyeY = top + ei;
-    const blink = (f % 30) === 0;
+    const blink = st !== "listen" && (f % 30) === 0;
     let eye = T.eye[pet.eyes] ? pet.eyes : "dot";
     if (st === "sleep" || st === "hibernate" || sickBed || st === "shy" || blink) eye = "closed";
     else if (st === "tickle") eye = "joy";
@@ -296,6 +296,7 @@
     if (st === "eat") mouth = (f % 4) < 2 ? "open" : "chew";
     else if (st === "happy" || st === "play") mouth = "grin";
     else if (st === "tickle") mouth = "open";
+    else if (st === "listen") mouth = "tiny";
     else if (st === "angry") mouth = f % 4 < 2 ? "frown" : "flat";
     else if (st === "shy") mouth = "flat";
     else if (st === "hungry") mouth = (f >> 2) % 2 ? "open" : "frown";
@@ -486,6 +487,15 @@
     /* where the top of the head is, in world pixels: the speech bubble follows it */
     const headTop = Math.max(0, grid.findIndex(r => r.some(Boolean)));
     const anchor = {x: Math.floor((W - 48) / 2) + ox + (grid.midX != null ? grid.midX : 16), y: gy - 34 + oy + headTop};
+    /* listening (the voice button is held): sound bars on both sides of the head follow the voice */
+    if (st === "listen"){
+      const mx = ox + (grid.midX != null ? grid.midX : 16), v = Math.max(0, Math.min(1, look.listen || 0)), cy = oy + headTop + 5;
+      ctx.fillStyle = "#3E8FD8";
+      [.55, 1, .55].forEach((p, k) => {
+        const h = Math.max(1, Math.round(v * p * 6 * (0.8 + 0.4 * ((f + k * 3) % 5) / 4)));
+        for (const side of [-1, 1]) ctx.fillRect((mx + side * (11 + k * 2) - (side < 0 ? 1 : 0)) * S, (cy - (h >> 1)) * S, S, h * S);
+      });
+    }
     if (grid.bubble){
       /* a see-through sleep bubble over the face: grows from the nose and pops */
       const r = [0, 1, 1, 2, 2, 3, 3, 0][(f >> 1) % 8], [bx0, by0] = grid.bubble;

@@ -219,8 +219,11 @@
     if (p){ p.textContent = t; p.classList.toggle("busy", !err); }
     if (typeof setStatus === "function") setStatus(t, err);
   }
+  /* the pet listens while the button is held: window.__petListen(true, level 0..1) / (false), provided by pet/ */
+  const petListen = (on, v) => { try { if (typeof window.__petListen === "function") window.__petListen(on, v || 0); } catch (e) {} };
   function setLevel(v){
     if (!hold) return;
+    petListen(true, v);
     hold.peak = Math.max(hold.peak, v);
     const h = hold.btn.clientHeight - 14, prof = [.45, .75, 1, .75, .45];
     hold.bars.forEach((b, i) => {
@@ -231,6 +234,8 @@
   function endHold(){
     if (!hold) return null;
     const h = hold; hold = null;
+    petListen(false);
+    const bar = document.getElementById("chatBar"); if (bar) bar.classList.remove("voiceHold");
     h.btn.classList.remove("holding", "rec");
     h.bars.forEach(b => b.style.height = "4px");
     if (h.timer) clearTimeout(h.timer);
@@ -326,6 +331,8 @@
     const engine = voiceEngine();
     hold = {btn, engine, t0: Date.now(), x: e.clientX, y: e.clientY, peak: 0, bars: Array.from(btn.querySelectorAll(".vu i"))};
     btn.classList.add("holding", "rec");
+    const bar = document.getElementById("chatBar"); if (bar) bar.classList.add("voiceHold");
+    petListen(true, 0);
     if (navigator.vibrate) try { navigator.vibrate(15); } catch (x) {}
     voiceSay("Слушаю… отпусти, чтобы отправить");
     hold.timer = setTimeout(() => voiceUp(btn, null), 120000);
@@ -347,7 +354,10 @@
 .pxBtn.mic .vu{position:absolute;inset:0;display:none;align-items:center;justify-content:center;gap:3px;background:var(--over);pointer-events:none}
 .pxBtn.mic.holding{animation:none;background:var(--over)}
 .pxBtn.mic.holding .vu{display:flex}
-.pxBtn.mic .vu i{display:block;width:4px;height:4px;background:#fff}`;
+.pxBtn.mic .vu i{display:block;width:4px;height:4px;background:#fff}
+.chatBar.voiceHold{align-items:flex-end}
+.chatBar.voiceHold .chatOpen{height:auto;min-height:44px;padding:8px 10px;align-items:flex-start}
+.chatBar.voiceHold .chatPrev{white-space:normal;overflow:visible;text-overflow:clip;font-size:17px;line-height:1.3;color:var(--fg)}`;
     document.head.append(st);
     for (const b of btns){
       b.onclick = null;
