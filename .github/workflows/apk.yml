@@ -8,7 +8,7 @@ name: APK
 on:
   push:
     branches: [main, develop]
-  # a PR into develop or main builds both APKs as run artifacts to try before merging, no release
+  # a PR into develop or main builds both APKs to try before merging: run artifacts and a pre-release pr-<number>
   pull_request:
     branches: [main, develop]
   workflow_dispatch:
@@ -81,3 +81,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$TAG" "dist/$APK_CLASSIC" "dist/$APK_PET" --target "$GITHUB_SHA" --title "$VERSION_NAME" $PRERELEASE --notes "Сборка из ${{ github.ref_name }}, коммит ${GITHUB_SHA::7}."
+      # a PR keeps one pre-release "pr-<number>" with plain APKs (run artifacts always come zipped); rebuilt on every push
+      - name: PR pre-release
+        if: env.SIGNING_KEYSTORE != '' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          gh release delete "pr-$PR" --cleanup-tag --yes || true
+          gh release create "pr-$PR" "dist/$APK_CLASSIC" "dist/$APK_PET" --target "$HEAD_SHA" --prerelease --title "PR #$PR ($VERSION_NAME)" --notes "Сборка PR #$PR, коммит ${HEAD_SHA::7}. Пересобирается при каждом пуше в PR."
