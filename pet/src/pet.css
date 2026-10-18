@@ -94,7 +94,7 @@ h3{font-size:16px;margin:6px 0 0}
 .hud .say{position:absolute;left:50%;top:0;width:max-content;max-width:min(496px,calc(100% - 24px));transform:translateX(-50%);margin:0;visibility:hidden;background:#FFFFFF;color:#1B1F24;border:3px solid #1B1F24;box-shadow:3px 3px 0 rgba(14,16,22,.45);
   padding:8px 12px;min-height:0;font-size:17px;line-height:1.4;text-align:center}
 .hud .say.loading #petSayText{color:#5B635E}
-.hud .say::before,.hud .say::after{content:"";position:absolute;left:50%;transform:translateX(-50%);display:block}
+.hud .say::before,.hud .say::after{content:"";position:absolute;left:calc(50% + var(--tx, 0px));transform:translateX(-50%);display:block}
 .hud .say::before{bottom:-23px;width:28px;height:21px;background:#1B1F24;clip-path:polygon(0 0,100% 0,100% 20%,80% 20%,80% 40%,70% 40%,70% 60%,60% 60%,60% 80%,50% 80%,50% 100%,40% 100%,40% 60%,30% 60%,30% 40%,20% 40%,20% 20%,0 20%)}
 .hud .say::after{bottom:-15px;width:20px;height:16px;background:#FFFFFF;clip-path:polygon(0 0,100% 0,100% 25%,75% 25%,75% 50%,62% 50%,62% 75%,50% 75%,50% 100%,38% 100%,38% 50%,25% 50%,25% 25%,0 25%)}
 .hud .day{display:flex;flex-direction:column;gap:10px}
@@ -199,12 +199,15 @@ svg text{font-size-adjust:.5!important}
 
 .chipWait{font-size:14px}
 .hudPanel[hidden]{display:none!important}
-/* the id line: name, stage and state share one text baseline; the streak sits at the right, next to the buttons */
-.idLine{align-items:baseline}
-.idLine > *:not(.topBtns){display:inline-block;line-height:1.2}
-.idLine b{line-height:1.2}
-.idLine .sceneTag{padding:0 6px}
-.idLine .streak{margin-left:auto;display:inline-flex;align-items:baseline;gap:3px}
+/* the id block: the name on top, then one line with stage, state and streak; on a narrow phone the stage text shortens, the state never wraps */
+.idLine{display:flex;flex-direction:column;align-items:stretch;gap:2px;min-width:0;margin-right:0}
+.idLine b{max-width:calc(100% - 88px);box-sizing:border-box}
+.idLine b{line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.idMeta{display:flex;align-items:baseline;gap:8px;min-width:0;width:100%;overflow:hidden;white-space:nowrap;line-height:1.2}
+.idMeta #petStage{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.idMeta .sceneTag{flex-shrink:0;padding:0 6px}
+.idMeta .streak{flex-shrink:0;margin-left:auto;display:inline-flex;align-items:baseline;gap:3px}
+.idMeta [hidden]{display:none!important}
 .idLine .streak svg{align-self:center}
 .say .fx{color:#8A8C93}
 .pmInfo dd.pmWords{color:var(--muted)}

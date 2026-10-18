@@ -230,14 +230,17 @@ $("#petCv").parentElement.onclick = () => {
       /* day and night swap through a sunset, one step every few frames */
       const want = {morning: .5, day: 0, evening: .5, night: 1}[look.tod] ?? (look.night ? 1 : 0);
       if (skyT === null) skyT = want; else if (skyT !== want) skyT = want > skyT ? Math.min(want, skyT + 1 / 64) : Math.max(want, skyT - 1 / 64);
-      PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop, sky: skyT, dawn: look.tod === "morning", noThought: true});
+      const at = PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop, sky: skyT, dawn: look.tod === "morning", noThought: true});
       /* a hungry pet shows what it wants inside its own speech bubble, one component with the words */
       sayFoodIcon(look.state === "hungry" ? sayFood($("#petSayText").textContent) || look.food || "apple" : null);
       /* the bubble sits right above the pet's head, its tail pointing down at it */
-      const hr = $("#hud").getBoundingClientRect(), headY = wr.top + (ground - 30 + head) * S / dpr - hr.top;
-      const cx = wr.left + (Math.floor((W - 48) / 2) + 24) * S / dpr - hr.left;
-      const top = Math.max(sp.top - hr.top, headY - sayH);
-      say.style.top = Math.round(top) + "px"; say.style.left = Math.round(cx) + "px"; say.style.visibility = "visible";
+      /* it follows the pet as it walks and hops; near a screen edge the bubble stays on screen and its tail slides over to the pet */
+      const hr = $("#hud").getBoundingClientRect(), headY = at ? wr.top + at.y * S / dpr - hr.top : wr.top + (ground - 30 + head) * S / dpr - hr.top;
+      const cx = at ? wr.left + (at.x + .5) * S / dpr - hr.left : wr.left + (Math.floor((W - 48) / 2) + 24) * S / dpr - hr.left;
+      const bw = say.offsetWidth, left = Math.min(Math.max(cx, bw / 2 + 12), hr.width - bw / 2 - 12);
+      const top = Math.max(sp.top - hr.top, headY - sayH + 2);
+      say.style.top = Math.round(top) + "px"; say.style.left = Math.round(left) + "px";
+      say.style.setProperty("--tx", Math.round(Math.max(-bw / 2 + 24, Math.min(bw / 2 - 24, cx - left))) + "px"); say.style.visibility = "visible";
     }
     const tag = look.stage === "egg" ? "" : (look.toy === "dance" && look.state === "play" ? "Танцует" : STATE_TAG[look.state] || "");
     if (tag !== lastTag){ const t = $("#sceneTag"); t.hidden = !tag; t.textContent = tag; lastTag = tag; }
