@@ -89,14 +89,20 @@ h3{font-size:16px;margin:6px 0 0}
 .idLine{margin-right:88px;min-height:38px}
 .topBtns .pxBtn{width:38px;height:38px;border-width:2px;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.35)}
 .idLine .streak{color:var(--over)}
-/* the pet's line: a white speech bubble whose pixel tail points down at the pet */
+/* the pet's line: a white speech bubble beside the pet's head, its pixel tail coming out of its side towards the head;
+   hidden until the pet says something (.show), then it pops up and the line types in letter by letter */
 .hudTop{display:flex;flex-direction:column;gap:10px}
-.hud .say{position:absolute;left:50%;top:0;width:max-content;max-width:min(496px,calc(100% - 24px));transform:translateX(-50%);margin:0;visibility:hidden;background:#FFFFFF;color:#1B1F24;border:3px solid #1B1F24;box-shadow:3px 3px 0 rgba(14,16,22,.45);
-  padding:8px 12px;min-height:0;font-size:17px;line-height:1.4;text-align:center}
+.hud .say{position:absolute;left:0;top:0;width:max-content;max-width:300px;margin:0;visibility:hidden;opacity:0;background:#FFFFFF;color:#1B1F24;border:3px solid #1B1F24;box-shadow:3px 3px 0 rgba(14,16,22,.45);
+  padding:8px 12px;min-height:0;font-size:17px;line-height:1.4;text-align:left;transform:scale(.6);transform-origin:0 100%;transition:opacity .12s steps(2),transform .12s steps(2),visibility 0s .12s}
+.hud .say.sideL{transform-origin:100% 100%}
+.hud .say.show{visibility:visible;opacity:1;transform:none;transition:opacity .12s steps(2),transform .12s steps(2)}
 .hud .say.loading #petSayText{color:#5B635E}
-.hud .say::before,.hud .say::after{content:"";position:absolute;left:calc(50% + var(--tx, 0px));transform:translateX(-50%);display:block}
-.hud .say::before{bottom:-23px;width:28px;height:21px;background:#1B1F24;clip-path:polygon(0 0,100% 0,100% 20%,80% 20%,80% 40%,70% 40%,70% 60%,60% 60%,60% 80%,50% 80%,50% 100%,40% 100%,40% 60%,30% 60%,30% 40%,20% 40%,20% 20%,0 20%)}
-.hud .say::after{bottom:-15px;width:20px;height:16px;background:#FFFFFF;clip-path:polygon(0 0,100% 0,100% 25%,75% 25%,75% 50%,62% 50%,62% 75%,50% 75%,50% 100%,38% 100%,38% 50%,25% 50%,25% 25%,0 25%)}
+.hud .say::before{content:"";position:absolute;left:-21px;bottom:-9px;width:24px;height:18px;background:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 6' shape-rendering='crispEdges'><rect x='6' y='0' width='1' height='1' fill='%231B1F24'/><rect x='7' y='0' width='1' height='1' fill='%23FFFFFF'/><rect x='4' y='1' width='1' height='1' fill='%231B1F24'/><rect x='5' y='1' width='1' height='1' fill='%231B1F24'/><rect x='6' y='1' width='1' height='1' fill='%23FFFFFF'/><rect x='7' y='1' width='1' height='1' fill='%23FFFFFF'/><rect x='3' y='2' width='1' height='1' fill='%231B1F24'/><rect x='4' y='2' width='1' height='1' fill='%23FFFFFF'/><rect x='5' y='2' width='1' height='1' fill='%23FFFFFF'/><rect x='6' y='2' width='1' height='1' fill='%23FFFFFF'/><rect x='7' y='2' width='1' height='1' fill='%231B1F24'/><rect x='2' y='3' width='1' height='1' fill='%231B1F24'/><rect x='3' y='3' width='1' height='1' fill='%23FFFFFF'/><rect x='4' y='3' width='1' height='1' fill='%23FFFFFF'/><rect x='5' y='3' width='1' height='1' fill='%231B1F24'/><rect x='6' y='3' width='1' height='1' fill='%231B1F24'/><rect x='1' y='4' width='1' height='1' fill='%231B1F24'/><rect x='2' y='4' width='1' height='1' fill='%23FFFFFF'/><rect x='3' y='4' width='1' height='1' fill='%231B1F24'/><rect x='4' y='4' width='1' height='1' fill='%231B1F24'/><rect x='0' y='5' width='1' height='1' fill='%231B1F24'/><rect x='1' y='5' width='1' height='1' fill='%231B1F24'/></svg>") no-repeat 0 0/100% 100%;image-rendering:pixelated}
+.hud .say::after{content:none}
+.say .untyped{visibility:hidden}
+.hud .say.sideL::before{left:auto;right:-21px;transform:scaleX(-1)}
+.say .dots::after{content:"•";display:inline-block;color:#5B635E;animation:sayDots 1.2s steps(1) infinite}
+@keyframes sayDots{0%{content:"•"}33%{content:"••"}66%{content:"•••"}}
 .hud .day{display:flex;flex-direction:column;gap:10px}
 .hud .sumPace{display:none}
 .hudBottom{position:relative}
@@ -199,11 +205,12 @@ svg text{font-size-adjust:.5!important}
 
 .chipWait{font-size:14px}
 .hudPanel[hidden]{display:none!important}
-/* the id block: the name on top, then one line with stage, state and streak; on a narrow phone the stage text shortens, the state never wraps */
+/* the id block: the name on top, then one line with stage, state and streak; on a narrow phone the stage text shortens, the state never wraps;
+   both lines stop short of the two buttons, so the streak never slides under them */
 .idLine{display:flex;flex-direction:column;align-items:stretch;gap:2px;min-width:0;margin-right:0}
 .idLine b{max-width:calc(100% - 88px);box-sizing:border-box}
 .idLine b{line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.idMeta{display:flex;align-items:baseline;gap:8px;min-width:0;width:100%;overflow:hidden;white-space:nowrap;line-height:1.2}
+.idMeta{display:flex;align-items:baseline;gap:8px;min-width:0;width:calc(100% - 88px);overflow:hidden;white-space:nowrap;line-height:1.2}
 .idMeta #petStage{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .idMeta .sceneTag{flex-shrink:0;padding:0 6px}
 .idMeta .streak{flex-shrink:0;margin-left:auto;display:inline-flex;align-items:baseline;gap:3px}

@@ -171,14 +171,14 @@ $("#petCv").parentElement.onclick = () => {
   const st = petStatsNow ? petState(petStatsNow) : "idle";
   if (st === "sleep" || st === "hibernate"){
     const now = Date.now();
-    if (now - lastPokeLine > 8000){ lastPokeLine = now; setLine(localLine(petStatsNow, st)); }
+    if (!sayShown() || now - lastPokeLine > 8000){ lastPokeLine = now; setLine(localLine(petStatsNow, st)); }
     return;
   }
   /* a single tap is a pat; three or more quick taps get the pet's own reaction */
   const now = Date.now();
   pokes = pokes.filter(t => now - t < 2500); pokes.push(now); petPokes = pokes.length;
   /* taps and pokes take the day's AI-written lines, so they cost no request */
-  if (pokes.length < 3){ petEvent("happy", 1600); if (now - lastPokeLine > 8000){ lastPokeLine = now; setLine(localLine(petStatsNow, "happy")); } return; }
+  if (pokes.length < 3){ petEvent("happy", 1600); if (!sayShown() || now - lastPokeLine > 8000){ lastPokeLine = now; setLine(localLine(petStatsNow, "happy")); } return; }
   const r = TOUCH[petTouch()];
   petEvent(r.state, 2600);
   if (!lineBusy && now - lastPokeLine > 2500){ lastPokeLine = now; setLine(localLine(petStatsNow, r.state)); }
@@ -189,7 +189,7 @@ $("#petCv").parentElement.onclick = () => {
   const ctx = $("#petCv").getContext("2d");
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   let f = 0, lastTag = "", skyT = null;
-  try { const l = JSON.parse(localStorage.getItem("petLine") || "null"); if (l && l.d === todayKey() && l.t) setLine(l.t); } catch (e) {}
+  try { const l = JSON.parse(localStorage.getItem("petLine") || "null"); if (l && l.d === todayKey() && l.t) setLine(l.t, false, true); } catch (e) {}
   /* the top row of the pet's head when standing still, cached per look */
   let headKey = "", headVal = 4;
   function headRow(p, look){
@@ -223,7 +223,8 @@ $("#petCv").parentElement.onclick = () => {
       if (cv.width !== W * S || cv.height !== H * S){ cv.width = W * S; cv.height = H * S; cv.style.width = W * S / dpr + "px"; cv.style.height = H * S / dpr + "px"; }
       /* the pet stands a little below the top block, never lower than the free space */
       const sp = $("#petSpace").getBoundingClientRect(), toLog = y => Math.round((y - wr.top) * dpr / S);
-      const say = $("#petSay"), sayH = say.offsetHeight + 22, head = headRow(p, look);
+      /* room for a two-line bubble is kept above the head whether the pet talks or not, so the pet does not jump */
+      const say = $("#petSay"), sayH = 92, head = headRow(p, look);
       /* room above the head for the speech bubble, then the pet, then the ground */
       const ground = Math.max(32, Math.min(H - 2, toLog(sp.bottom), toLog(sp.top) + Math.ceil(sayH * dpr / S) + 34 - head + 2));
       const skyTop = toLog($(".topCard").getBoundingClientRect().bottom);
@@ -233,14 +234,18 @@ $("#petCv").parentElement.onclick = () => {
       const at = PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop, sky: skyT, dawn: look.tod === "morning", noThought: true});
       /* a hungry pet shows what it wants inside its own speech bubble, one component with the words */
       sayFoodIcon(look.state === "hungry" ? sayFood($("#petSayText").textContent) || look.food || "apple" : null);
-      /* the bubble sits right above the pet's head, its tail pointing down at it */
-      /* it follows the pet as it walks and hops; near a screen edge the bubble stays on screen and its tail slides over to the pet */
+      /* the bubble sits beside the pet's head, on the side with more room, its tail coming out of its side towards the head;
+         it follows the pet as it walks and hops and swaps sides when the pet gets near an edge */
       const hr = $("#hud").getBoundingClientRect(), headY = at ? wr.top + at.y * S / dpr - hr.top : wr.top + (ground - 30 + head) * S / dpr - hr.top;
       const cx = at ? wr.left + (at.x + .5) * S / dpr - hr.left : wr.left + (Math.floor((W - 48) / 2) + 24) * S / dpr - hr.left;
-      const bw = say.offsetWidth, left = Math.min(Math.max(cx, bw / 2 + 12), hr.width - bw / 2 - 12);
-      const top = Math.max(sp.top - hr.top, headY - sayH + 2);
+      const gap = 4 * S / dpr, roomR = hr.width - 12 - (cx + gap), roomL = cx - gap - 12;
+      const right = say.classList.contains("sideL") ? roomR > roomL + 40 : roomR >= roomL - 40;
+      say.classList.toggle("sideL", !right);
+      say.style.maxWidth = Math.round(Math.min(300, hr.width - 24, Math.max(190, (right ? roomR : roomL) - 18))) + "px";
+      const bw = say.offsetWidth, bh = say.offsetHeight;
+      const left = right ? Math.max(12, Math.min(cx + gap + 18, hr.width - 12 - bw)) : Math.min(hr.width - 12 - bw, Math.max(12, cx - gap - 18 - bw));
+      const top = Math.max(sp.top - hr.top, headY - bh - 6);
       say.style.top = Math.round(top) + "px"; say.style.left = Math.round(left) + "px";
-      say.style.setProperty("--tx", Math.round(Math.max(-bw / 2 + 24, Math.min(bw / 2 - 24, cx - left))) + "px"); say.style.visibility = "visible";
     }
     const tag = look.stage === "egg" ? "" : (look.toy === "dance" && look.state === "play" ? "Танцует" : STATE_TAG[look.state] || "");
     if (tag !== lastTag){ const t = $("#sceneTag"); t.hidden = !tag; t.textContent = tag; lastTag = tag; }
@@ -250,6 +255,31 @@ $("#petCv").parentElement.onclick = () => {
   setInterval(() => { if (!reduce || f % 6 === 0) tick(); else f++; }, 160);
   /* time moves on: hunger, night, hibernation */
   setInterval(() => { if (typeof days !== "undefined") petOnRender(); }, 60000);
+})();
+
+/* ---------- when the pet talks by itself ----------
+   Besides answering taps, meals and changes of state, the pet says something now and then while its screen is open:
+   every 2–5 minutes a line from the day's AI-written set, at most every 15 minutes a fresh AI line about the moment
+   (meal time and nothing logged for hours, late night, or just how it feels). Asleep, it mumbles half as often. */
+(() => {
+  let next = Date.now() + 2500;
+  const gap = () => (120 + Math.random() * 180) * 1000;
+  setInterval(() => {
+    const now = Date.now();
+    if (now - sayAt < 20000 && sayAt) next = Math.max(next, sayAt + gap());
+    if (now < next || document.hidden || petListening || sayShown() || lineBusy) return;
+    if ($("#screens").dataset.screen !== "pet" || $("#chatSheet").dataset.open === "true" || !$("#petMenu").hidden) return;
+    next = now + gap();
+    const s = petStatsNow || {};
+    if (!pet){ if (!hatching) setLine(localLine(s, "idle")); return; }
+    if (petDemo){ setLine(localLine(s, petDemo.state)); return; }
+    const st = petState(s), h = new Date().getHours(), asleep = st === "sleep" || st === "hibernate";
+    if (asleep && Math.random() < .5) return;
+    if (sample && now - lineAt > 15 * 60000){
+      const meal = (h >= 8 && h < 10) || (h >= 13 && h < 15) || (h >= 18 && h < 20);
+      requestLine(asleep ? "timer" : meal && !(s.sinceH < 3) ? "meal" : h >= 23 || h < 5 ? "late" : "timer", true);
+    } else setLine(localLine(s, st));
+  }, 4000);
 })();
 chatBarPreview();
 

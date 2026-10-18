@@ -144,21 +144,49 @@ let petListening = null;
 window.__petListen = (on, level) => {
   const box = $("#petSayText");
   if (on){
-    if (!petListening) petListening = {saved: Array.from(box.childNodes, n => n.cloneNode(true)), level: 0};
+    if (!petListening){ sayStop(); petListening = {saved: Array.from(box.childNodes, n => n.cloneNode(true)), level: 0}; }
     petListening.level = level || 0;
     const n = 1 + Math.round(petListening.level * 4);
     box.replaceChildren(el("span",{class:"fx", text: "(" + "•".repeat(n) + ")"}));
-  } else if (petListening){ box.replaceChildren(...petListening.saved); petListening = null; }
+    $("#petSay").classList.add("show");
+  } else if (petListening){ box.replaceChildren(...petListening.saved); petListening = null; $("#petSay").classList.remove("show"); }
 };
 
-/* ---------- lines written by the AI ---------- */
-let lineAt = 0, lineBusy = false, lineKey = "";
-function setLine(t, loading){
+/* ---------- lines written by the AI ----------
+   The bubble is not always there: it pops up when the pet has something to say (a tap, a meal, the app opened,
+   the state changed, now and then by itself, see the chatter timer in tail.js), types the line letter by letter
+   like the chat's AI answers, stays long enough to read and hides again. While the AI writes, it shows thinking dots. */
+let lineAt = 0, lineBusy = false, lineKey = "", sayAt = 0;
+let sayTyping = null, sayHide = null;
+function sayStop(){ clearInterval(sayTyping); clearTimeout(sayHide); sayTyping = sayHide = null; }
+function sayShown(){ return $("#petSay").classList.contains("show"); }
+function setLine(t, loading, quiet){
   /* sounds in brackets are heard, not said: shown paler */
-  const box = $("#petSayText"); box.textContent = "";
-  String(t).split(/(\([^)]*\))/).filter(Boolean).forEach(x => box.append(x[0] === "(" ? el("span",{class:"fx", text: x}) : document.createTextNode(x)));
-  $("#petSay").classList.toggle("loading", !!loading);
+  const box = $("#petSayText"), bub = $("#petSay");
+  sayStop();
   if (!loading) try { localStorage.setItem("petLine", JSON.stringify({t, d: todayKey(), at: Date.now(), st: pet && petStatsNow ? petState(petStatsNow, true) : ""})); } catch (e) {}
+  if (petListening){ petListening.saved = [document.createTextNode(String(t))]; return; }
+  const parts = String(t).split(/(\([^)]*\))/).filter(Boolean).map(x => ({fx: x[0] === "(", text: x}));
+  /* the letters not typed yet are there but invisible, so the bubble has its final size from the first letter */
+  const fill = n => {
+    box.textContent = ""; let k = n;
+    const rest = el("span",{class:"untyped"});
+    for (const p of parts){
+      const x = p.text.slice(0, Math.max(0, k)), y = p.text.slice(x.length); k -= p.text.length;
+      if (x) box.append(p.fx ? el("span",{class:"fx", text: x}) : document.createTextNode(x));
+      if (y) rest.append(y);
+    }
+    if (rest.textContent) box.append(rest);
+  };
+  bub.classList.toggle("loading", !!loading);
+  if (quiet){ fill(Infinity); return; }
+  sayAt = Date.now();
+  bub.classList.add("show");
+  if (loading){ box.replaceChildren(el("span",{class:"dots"})); return; }
+  const all = parts.reduce((a, p) => a + p.text.length, 0);
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches){ fill(all); }
+  else { let n = 0; fill(0); sayTyping = setInterval(() => { n = Math.min(all, n + 1); fill(n); if (n >= all){ clearInterval(sayTyping); sayTyping = null; } }, 45); }
+  sayHide = setTimeout(() => { if (!petListening) bub.classList.remove("show"); }, all * 45 + Math.min(9000, 3500 + all * 60));
 }
 /* how the pet takes being poked again and again: set at hatching, so the AI knows how to react */
 const TOUCH = {
@@ -234,6 +262,7 @@ function petFacts(s){
 }
 function localLine(s, st){
   const slow = a => a[Math.floor(Date.now() / 30000) % a.length];
+  if (!pet && !hatching && eggPack && eggPack.d === todayKey() && eggPack.lines.length) return eggPack.lines[Math.floor(Math.random() * eggPack.lines.length)];
   if (!pet) return hatching ? slow(["(крак-крак) Уа! Моя тут-ку!", "(хрусь) Мо… узе скоро-фа!", "(крак) Пливет-мо?"])
     : slow(["(тук-тук) Ням-ням дась? Вы-упка-мо!", "(тук… тук) Ням дай — моя вы-ес-ку.", "(хрусь) Ням зду моя, мо-мо…"]);
   const stage = petStage(petAge()), baby = stage === "baby";
@@ -259,8 +288,24 @@ const PACK_STATES = {idle:"спокоен, всё нормально", hungry:"�
   sickbed:"болеет и ночью лежит в кровати под одеялом с градусником, сонно бормочет и покашливает, кашель в скобках", sleep:"спит и бормочет во сне: сонные обрывки слов про еду или сны, многоточия, храп в скобках, к хозяину не обращается", hibernate:"в глубокой спячке, хозяин давно не записывал еду: бормочет сквозь сон, что проснётся от ням, храп в скобках", tickle:"хозяин часто тыкает, а ему щекотно", angry:"хозяин часто тыкает, а он злится", shy:"хозяин часто тыкает, а он смущается", happy:"хозяин гладит, ему приятно"};
 let linePack = null, packBusy = false;
 try { linePack = JSON.parse(localStorage.getItem("petLinePack5") || "null"); } catch (e) {}
+/* the egg's knocks from inside are written by the AI too, once a day */
+let eggPack = null;
+try { eggPack = JSON.parse(localStorage.getItem("petEggPack") || "null"); } catch (e) {}
+async function refreshEggPack(){
+  if (pet || hatching || !sample || packBusy || (eggPack && eggPack.d === todayKey())) return;
+  packBusy = true;
+  const prompt = `Ты — ещё не вылупившийся малыш внутри яйца в игре-дневнике питания. Ты вылупишься, когда хозяин запишет первую еду. Как ты говоришь: ${SPEECH.baby.rule}
+Напиши 6 разных коротких реплик из яйца хозяину, не длиннее ${SPEECH.baby.max} символов: стучишься изнутри, просишь ням, чтобы вылупиться, ворочаешься, отвечаешь на постукивание по скорлупе. Стук и хруст скорлупы пиши в скобках: (тук-тук), (хрусь). Без цифр, эмодзи и кавычек.
+Ответь только JSON: {"lines":["…","…"]}`;
+  try {
+    const r = await sample.json(prompt, {modelTier:"quick", cache:false});
+    const ok = (Array.isArray(r && r.lines) ? r.lines : []).map(x => petSpeak(x, "baby", SPEECH.baby.max)).filter(Boolean).slice(0, 8);
+    if (ok.length >= 3){ eggPack = {d: todayKey(), lines: ok}; try { localStorage.setItem("petEggPack", JSON.stringify(eggPack)); } catch (e) {} }
+  } catch (e) {} finally { packBusy = false; }
+}
 async function refreshLinePack(){
-  if (!pet || !sample || packBusy) return;
+  if (!pet){ refreshEggPack(); return; }
+  if (!sample || packBusy) return;
   const stage = petStage(petAge());
   if (linePack && linePack.stage === stage && linePack.name === pet.name && linePack.d === todayKey()) return;
   packBusy = true;
@@ -302,7 +347,9 @@ async function requestLine(reason, force){
   if (!force && Date.now() - lineAt < 90000) return;
   lineBusy = true; lineAt = Date.now();
   const s = petStatsNow, st = petState(s), stage = petStage(petAge()), br = petBranch(s, stage);
-  const why = {poke: `хозяин тыкает в тебя уже ${petPokes} раз подряд, а ты ${TOUCH[petTouch()].ru}`, eat:"хозяин только что записал еду", tap:"хозяин тебя погладил", state:"твоё состояние изменилось", open:"хозяин открыл приложение", hatch:"ты только что вылупился", wake:"ты спишь, а хозяин тыкает в тебя и будит: ответь сонно, сквозь сон, со звуком храпа"}[reason] || "просто так";
+  const why = {poke: `хозяин тыкает в тебя уже ${petPokes} раз подряд, а ты ${TOUCH[petTouch()].ru}`, eat:"хозяин только что записал еду", tap:"хозяин тебя погладил", state:"твоё состояние изменилось", open:"хозяин открыл приложение", hatch:"ты только что вылупился", wake:"ты спишь, а хозяин тыкает в тебя и будит: ответь сонно, сквозь сон, со звуком храпа",
+    timer:"хозяин давно молчит, а ты просто хочешь что-то сказать: про своё самочувствие, про время суток, про игру или про еду", meal:"сейчас время поесть, а хозяин давно ничего не записывал: напомни про ням по-своему",
+    morning:"хозяин впервые за день открыл приложение: поздоровайся по-утреннему", late:"уже поздно, а хозяин не спит: скажи сонно, что пора бай-бай"}[reason] || "просто так";
   const prompt = `Ты — ${pet.name}, 8-битный питомец в дневнике питания хозяина. Характер: ${pet.trait || "добрый и любопытный"}. Стадия: ${STAGE_RU[stage]}${br ? ", ветка развития «" + BRANCH_RU[br][0] + "»" : ""}.
 Сейчас ${new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}, ${TOD_RU[petTod(s)]}. Ты ${STATE_RU[st] || "спокоен"}.
 Как ты себя чувствуешь: здоровье ${s.health > 60 ? "хорошее" : s.health > 30 ? "так себе" : "плохое"}, настроение ${s.mood > 60 ? "хорошее" : s.mood > 30 ? "среднее" : "плохое"}, сытость ${s.food > 60 ? "сыт" : s.food > 30 ? "немного голоден" : "голоден"}.
@@ -311,7 +358,7 @@ async function requestLine(reason, force){
 Как ты говоришь: ${speechRule(stage)}
 Напиши одну реплику питомца хозяину, по-русски, не длиннее ${SPEECH[stage].max} символов. Живо, с характером, по-доброму, по поводу и по тому, что важно сейчас (голоден, переел, мало сытной еды, вкусно). Никогда не говори взрослых слов про диету: норма, калории, ккал, белок, БЖУ, порция, и без цифр. Без эмодзи, кавычек и хэштегов. Если в реплике ты придумал или исковеркал новое словечко, которого нет в словарике, верни его в words с тем, что оно значит.
 Ответь только JSON: {"line":"реплика","words":[{"w":"словечко","m":"что значит, 1–3 слова"}]} (words можно пустым).`;
-  setLine($("#petSayText").textContent, true);
+  setLine("", true);
   try {
     const r = await sample.json(prompt, {modelTier:"quick", cache:false});
     const t = petSpeak(r && r.line, stage, SPEECH[stage].max);
@@ -429,11 +476,10 @@ function petOnRender(){
     const first = !lineKey; lineKey = key;
     let saved = null; try { saved = JSON.parse(localStorage.getItem("petLine") || "null"); } catch (e) {}
     const fresh = saved && saved.at && saved.st === key && Date.now() - saved.at < 45 * 60000;
-    if (first ? !fresh : Date.now() - lineAt > 5 * 60000){ if (sample) requestLine(first ? "open" : "state", true); else setLine(localLine(s, key)); }
-    else if (!first && !(petEvt && petEvt.until > Date.now())) setLine(localLine(s, key));
+    if (first ? !fresh : Date.now() - lineAt > 5 * 60000){ if (sample) requestLine(first ? (!(saved && saved.d === todayKey()) && new Date().getHours() < 12 ? "morning" : "open") : "state", true); else setLine(localLine(s, key)); }
+    else if (first || !(petEvt && petEvt.until > Date.now())) setLine(localLine(s, key));
   }
-  if (!pet) setLine(localLine(s, st));
-  else refreshLinePack();
+  refreshLinePack();
 }
 function petLook(){
   const s = petStatsNow || {fat: 50, muscle: 45};

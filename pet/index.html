@@ -336,14 +336,20 @@ h3{font-size:16px;margin:6px 0 0}
 .idLine{margin-right:88px;min-height:38px}
 .topBtns .pxBtn{width:38px;height:38px;border-width:2px;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.35)}
 .idLine .streak{color:var(--over)}
-/* the pet's line: a white speech bubble whose pixel tail points down at the pet */
+/* the pet's line: a white speech bubble beside the pet's head, its pixel tail coming out of its side towards the head;
+   hidden until the pet says something (.show), then it pops up and the line types in letter by letter */
 .hudTop{display:flex;flex-direction:column;gap:10px}
-.hud .say{position:absolute;left:50%;top:0;width:max-content;max-width:min(496px,calc(100% - 24px));transform:translateX(-50%);margin:0;visibility:hidden;background:#FFFFFF;color:#1B1F24;border:3px solid #1B1F24;box-shadow:3px 3px 0 rgba(14,16,22,.45);
-  padding:8px 12px;min-height:0;font-size:17px;line-height:1.4;text-align:center}
+.hud .say{position:absolute;left:0;top:0;width:max-content;max-width:300px;margin:0;visibility:hidden;opacity:0;background:#FFFFFF;color:#1B1F24;border:3px solid #1B1F24;box-shadow:3px 3px 0 rgba(14,16,22,.45);
+  padding:8px 12px;min-height:0;font-size:17px;line-height:1.4;text-align:left;transform:scale(.6);transform-origin:0 100%;transition:opacity .12s steps(2),transform .12s steps(2),visibility 0s .12s}
+.hud .say.sideL{transform-origin:100% 100%}
+.hud .say.show{visibility:visible;opacity:1;transform:none;transition:opacity .12s steps(2),transform .12s steps(2)}
 .hud .say.loading #petSayText{color:#5B635E}
-.hud .say::before,.hud .say::after{content:"";position:absolute;left:calc(50% + var(--tx, 0px));transform:translateX(-50%);display:block}
-.hud .say::before{bottom:-23px;width:28px;height:21px;background:#1B1F24;clip-path:polygon(0 0,100% 0,100% 20%,80% 20%,80% 40%,70% 40%,70% 60%,60% 60%,60% 80%,50% 80%,50% 100%,40% 100%,40% 60%,30% 60%,30% 40%,20% 40%,20% 20%,0 20%)}
-.hud .say::after{bottom:-15px;width:20px;height:16px;background:#FFFFFF;clip-path:polygon(0 0,100% 0,100% 25%,75% 25%,75% 50%,62% 50%,62% 75%,50% 75%,50% 100%,38% 100%,38% 50%,25% 50%,25% 25%,0 25%)}
+.hud .say::before{content:"";position:absolute;left:-21px;bottom:-9px;width:24px;height:18px;background:url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 6' shape-rendering='crispEdges'><rect x='6' y='0' width='1' height='1' fill='%231B1F24'/><rect x='7' y='0' width='1' height='1' fill='%23FFFFFF'/><rect x='4' y='1' width='1' height='1' fill='%231B1F24'/><rect x='5' y='1' width='1' height='1' fill='%231B1F24'/><rect x='6' y='1' width='1' height='1' fill='%23FFFFFF'/><rect x='7' y='1' width='1' height='1' fill='%23FFFFFF'/><rect x='3' y='2' width='1' height='1' fill='%231B1F24'/><rect x='4' y='2' width='1' height='1' fill='%23FFFFFF'/><rect x='5' y='2' width='1' height='1' fill='%23FFFFFF'/><rect x='6' y='2' width='1' height='1' fill='%23FFFFFF'/><rect x='7' y='2' width='1' height='1' fill='%231B1F24'/><rect x='2' y='3' width='1' height='1' fill='%231B1F24'/><rect x='3' y='3' width='1' height='1' fill='%23FFFFFF'/><rect x='4' y='3' width='1' height='1' fill='%23FFFFFF'/><rect x='5' y='3' width='1' height='1' fill='%231B1F24'/><rect x='6' y='3' width='1' height='1' fill='%231B1F24'/><rect x='1' y='4' width='1' height='1' fill='%231B1F24'/><rect x='2' y='4' width='1' height='1' fill='%23FFFFFF'/><rect x='3' y='4' width='1' height='1' fill='%231B1F24'/><rect x='4' y='4' width='1' height='1' fill='%231B1F24'/><rect x='0' y='5' width='1' height='1' fill='%231B1F24'/><rect x='1' y='5' width='1' height='1' fill='%231B1F24'/></svg>") no-repeat 0 0/100% 100%;image-rendering:pixelated}
+.hud .say::after{content:none}
+.say .untyped{visibility:hidden}
+.hud .say.sideL::before{left:auto;right:-21px;transform:scaleX(-1)}
+.say .dots::after{content:"•";display:inline-block;color:#5B635E;animation:sayDots 1.2s steps(1) infinite}
+@keyframes sayDots{0%{content:"•"}33%{content:"••"}66%{content:"•••"}}
 .hud .day{display:flex;flex-direction:column;gap:10px}
 .hud .sumPace{display:none}
 .hudBottom{position:relative}
@@ -446,11 +452,12 @@ svg text{font-size-adjust:.5!important}
 
 .chipWait{font-size:14px}
 .hudPanel[hidden]{display:none!important}
-/* the id block: the name on top, then one line with stage, state and streak; on a narrow phone the stage text shortens, the state never wraps */
+/* the id block: the name on top, then one line with stage, state and streak; on a narrow phone the stage text shortens, the state never wraps;
+   both lines stop short of the two buttons, so the streak never slides under them */
 .idLine{display:flex;flex-direction:column;align-items:stretch;gap:2px;min-width:0;margin-right:0}
 .idLine b{max-width:calc(100% - 88px);box-sizing:border-box}
 .idLine b{line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.idMeta{display:flex;align-items:baseline;gap:8px;min-width:0;width:100%;overflow:hidden;white-space:nowrap;line-height:1.2}
+.idMeta{display:flex;align-items:baseline;gap:8px;min-width:0;width:calc(100% - 88px);overflow:hidden;white-space:nowrap;line-height:1.2}
 .idMeta #petStage{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .idMeta .sceneTag{flex-shrink:0;padding:0 6px}
 .idMeta .streak{flex-shrink:0;margin-left:auto;display:inline-flex;align-items:baseline;gap:3px}
@@ -1348,21 +1355,49 @@ let petListening = null;
 window.__petListen = (on, level) => {
   const box = $("#petSayText");
   if (on){
-    if (!petListening) petListening = {saved: Array.from(box.childNodes, n => n.cloneNode(true)), level: 0};
+    if (!petListening){ sayStop(); petListening = {saved: Array.from(box.childNodes, n => n.cloneNode(true)), level: 0}; }
     petListening.level = level || 0;
     const n = 1 + Math.round(petListening.level * 4);
     box.replaceChildren(el("span",{class:"fx", text: "(" + "•".repeat(n) + ")"}));
-  } else if (petListening){ box.replaceChildren(...petListening.saved); petListening = null; }
+    $("#petSay").classList.add("show");
+  } else if (petListening){ box.replaceChildren(...petListening.saved); petListening = null; $("#petSay").classList.remove("show"); }
 };
 
-/* ---------- lines written by the AI ---------- */
-let lineAt = 0, lineBusy = false, lineKey = "";
-function setLine(t, loading){
+/* ---------- lines written by the AI ----------
+   The bubble is not always there: it pops up when the pet has something to say (a tap, a meal, the app opened,
+   the state changed, now and then by itself, see the chatter timer in tail.js), types the line letter by letter
+   like the chat's AI answers, stays long enough to read and hides again. While the AI writes, it shows thinking dots. */
+let lineAt = 0, lineBusy = false, lineKey = "", sayAt = 0;
+let sayTyping = null, sayHide = null;
+function sayStop(){ clearInterval(sayTyping); clearTimeout(sayHide); sayTyping = sayHide = null; }
+function sayShown(){ return $("#petSay").classList.contains("show"); }
+function setLine(t, loading, quiet){
   /* sounds in brackets are heard, not said: shown paler */
-  const box = $("#petSayText"); box.textContent = "";
-  String(t).split(/(\([^)]*\))/).filter(Boolean).forEach(x => box.append(x[0] === "(" ? el("span",{class:"fx", text: x}) : document.createTextNode(x)));
-  $("#petSay").classList.toggle("loading", !!loading);
+  const box = $("#petSayText"), bub = $("#petSay");
+  sayStop();
   if (!loading) try { localStorage.setItem("petLine", JSON.stringify({t, d: todayKey(), at: Date.now(), st: pet && petStatsNow ? petState(petStatsNow, true) : ""})); } catch (e) {}
+  if (petListening){ petListening.saved = [document.createTextNode(String(t))]; return; }
+  const parts = String(t).split(/(\([^)]*\))/).filter(Boolean).map(x => ({fx: x[0] === "(", text: x}));
+  /* the letters not typed yet are there but invisible, so the bubble has its final size from the first letter */
+  const fill = n => {
+    box.textContent = ""; let k = n;
+    const rest = el("span",{class:"untyped"});
+    for (const p of parts){
+      const x = p.text.slice(0, Math.max(0, k)), y = p.text.slice(x.length); k -= p.text.length;
+      if (x) box.append(p.fx ? el("span",{class:"fx", text: x}) : document.createTextNode(x));
+      if (y) rest.append(y);
+    }
+    if (rest.textContent) box.append(rest);
+  };
+  bub.classList.toggle("loading", !!loading);
+  if (quiet){ fill(Infinity); return; }
+  sayAt = Date.now();
+  bub.classList.add("show");
+  if (loading){ box.replaceChildren(el("span",{class:"dots"})); return; }
+  const all = parts.reduce((a, p) => a + p.text.length, 0);
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches){ fill(all); }
+  else { let n = 0; fill(0); sayTyping = setInterval(() => { n = Math.min(all, n + 1); fill(n); if (n >= all){ clearInterval(sayTyping); sayTyping = null; } }, 45); }
+  sayHide = setTimeout(() => { if (!petListening) bub.classList.remove("show"); }, all * 45 + Math.min(9000, 3500 + all * 60));
 }
 /* how the pet takes being poked again and again: set at hatching, so the AI knows how to react */
 const TOUCH = {
@@ -1438,6 +1473,7 @@ function petFacts(s){
 }
 function localLine(s, st){
   const slow = a => a[Math.floor(Date.now() / 30000) % a.length];
+  if (!pet && !hatching && eggPack && eggPack.d === todayKey() && eggPack.lines.length) return eggPack.lines[Math.floor(Math.random() * eggPack.lines.length)];
   if (!pet) return hatching ? slow(["(крак-крак) Уа! Моя тут-ку!", "(хрусь) Мо… узе скоро-фа!", "(крак) Пливет-мо?"])
     : slow(["(тук-тук) Ням-ням дась? Вы-упка-мо!", "(тук… тук) Ням дай — моя вы-ес-ку.", "(хрусь) Ням зду моя, мо-мо…"]);
   const stage = petStage(petAge()), baby = stage === "baby";
@@ -1463,8 +1499,24 @@ const PACK_STATES = {idle:"спокоен, всё нормально", hungry:"�
   sickbed:"болеет и ночью лежит в кровати под одеялом с градусником, сонно бормочет и покашливает, кашель в скобках", sleep:"спит и бормочет во сне: сонные обрывки слов про еду или сны, многоточия, храп в скобках, к хозяину не обращается", hibernate:"в глубокой спячке, хозяин давно не записывал еду: бормочет сквозь сон, что проснётся от ням, храп в скобках", tickle:"хозяин часто тыкает, а ему щекотно", angry:"хозяин часто тыкает, а он злится", shy:"хозяин часто тыкает, а он смущается", happy:"хозяин гладит, ему приятно"};
 let linePack = null, packBusy = false;
 try { linePack = JSON.parse(localStorage.getItem("petLinePack5") || "null"); } catch (e) {}
+/* the egg's knocks from inside are written by the AI too, once a day */
+let eggPack = null;
+try { eggPack = JSON.parse(localStorage.getItem("petEggPack") || "null"); } catch (e) {}
+async function refreshEggPack(){
+  if (pet || hatching || !sample || packBusy || (eggPack && eggPack.d === todayKey())) return;
+  packBusy = true;
+  const prompt = `Ты — ещё не вылупившийся малыш внутри яйца в игре-дневнике питания. Ты вылупишься, когда хозяин запишет первую еду. Как ты говоришь: ${SPEECH.baby.rule}
+Напиши 6 разных коротких реплик из яйца хозяину, не длиннее ${SPEECH.baby.max} символов: стучишься изнутри, просишь ням, чтобы вылупиться, ворочаешься, отвечаешь на постукивание по скорлупе. Стук и хруст скорлупы пиши в скобках: (тук-тук), (хрусь). Без цифр, эмодзи и кавычек.
+Ответь только JSON: {"lines":["…","…"]}`;
+  try {
+    const r = await sample.json(prompt, {modelTier:"quick", cache:false});
+    const ok = (Array.isArray(r && r.lines) ? r.lines : []).map(x => petSpeak(x, "baby", SPEECH.baby.max)).filter(Boolean).slice(0, 8);
+    if (ok.length >= 3){ eggPack = {d: todayKey(), lines: ok}; try { localStorage.setItem("petEggPack", JSON.stringify(eggPack)); } catch (e) {} }
+  } catch (e) {} finally { packBusy = false; }
+}
 async function refreshLinePack(){
-  if (!pet || !sample || packBusy) return;
+  if (!pet){ refreshEggPack(); return; }
+  if (!sample || packBusy) return;
   const stage = petStage(petAge());
   if (linePack && linePack.stage === stage && linePack.name === pet.name && linePack.d === todayKey()) return;
   packBusy = true;
@@ -1506,7 +1558,9 @@ async function requestLine(reason, force){
   if (!force && Date.now() - lineAt < 90000) return;
   lineBusy = true; lineAt = Date.now();
   const s = petStatsNow, st = petState(s), stage = petStage(petAge()), br = petBranch(s, stage);
-  const why = {poke: `хозяин тыкает в тебя уже ${petPokes} раз подряд, а ты ${TOUCH[petTouch()].ru}`, eat:"хозяин только что записал еду", tap:"хозяин тебя погладил", state:"твоё состояние изменилось", open:"хозяин открыл приложение", hatch:"ты только что вылупился", wake:"ты спишь, а хозяин тыкает в тебя и будит: ответь сонно, сквозь сон, со звуком храпа"}[reason] || "просто так";
+  const why = {poke: `хозяин тыкает в тебя уже ${petPokes} раз подряд, а ты ${TOUCH[petTouch()].ru}`, eat:"хозяин только что записал еду", tap:"хозяин тебя погладил", state:"твоё состояние изменилось", open:"хозяин открыл приложение", hatch:"ты только что вылупился", wake:"ты спишь, а хозяин тыкает в тебя и будит: ответь сонно, сквозь сон, со звуком храпа",
+    timer:"хозяин давно молчит, а ты просто хочешь что-то сказать: про своё самочувствие, про время суток, про игру или про еду", meal:"сейчас время поесть, а хозяин давно ничего не записывал: напомни про ням по-своему",
+    morning:"хозяин впервые за день открыл приложение: поздоровайся по-утреннему", late:"уже поздно, а хозяин не спит: скажи сонно, что пора бай-бай"}[reason] || "просто так";
   const prompt = `Ты — ${pet.name}, 8-битный питомец в дневнике питания хозяина. Характер: ${pet.trait || "добрый и любопытный"}. Стадия: ${STAGE_RU[stage]}${br ? ", ветка развития «" + BRANCH_RU[br][0] + "»" : ""}.
 Сейчас ${new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}, ${TOD_RU[petTod(s)]}. Ты ${STATE_RU[st] || "спокоен"}.
 Как ты себя чувствуешь: здоровье ${s.health > 60 ? "хорошее" : s.health > 30 ? "так себе" : "плохое"}, настроение ${s.mood > 60 ? "хорошее" : s.mood > 30 ? "среднее" : "плохое"}, сытость ${s.food > 60 ? "сыт" : s.food > 30 ? "немного голоден" : "голоден"}.
@@ -1515,7 +1569,7 @@ async function requestLine(reason, force){
 Как ты говоришь: ${speechRule(stage)}
 Напиши одну реплику питомца хозяину, по-русски, не длиннее ${SPEECH[stage].max} символов. Живо, с характером, по-доброму, по поводу и по тому, что важно сейчас (голоден, переел, мало сытной еды, вкусно). Никогда не говори взрослых слов про диету: норма, калории, ккал, белок, БЖУ, порция, и без цифр. Без эмодзи, кавычек и хэштегов. Если в реплике ты придумал или исковеркал новое словечко, которого нет в словарике, верни его в words с тем, что оно значит.
 Ответь только JSON: {"line":"реплика","words":[{"w":"словечко","m":"что значит, 1–3 слова"}]} (words можно пустым).`;
-  setLine($("#petSayText").textContent, true);
+  setLine("", true);
   try {
     const r = await sample.json(prompt, {modelTier:"quick", cache:false});
     const t = petSpeak(r && r.line, stage, SPEECH[stage].max);
@@ -1633,11 +1687,10 @@ function petOnRender(){
     const first = !lineKey; lineKey = key;
     let saved = null; try { saved = JSON.parse(localStorage.getItem("petLine") || "null"); } catch (e) {}
     const fresh = saved && saved.at && saved.st === key && Date.now() - saved.at < 45 * 60000;
-    if (first ? !fresh : Date.now() - lineAt > 5 * 60000){ if (sample) requestLine(first ? "open" : "state", true); else setLine(localLine(s, key)); }
-    else if (!first && !(petEvt && petEvt.until > Date.now())) setLine(localLine(s, key));
+    if (first ? !fresh : Date.now() - lineAt > 5 * 60000){ if (sample) requestLine(first ? (!(saved && saved.d === todayKey()) && new Date().getHours() < 12 ? "morning" : "open") : "state", true); else setLine(localLine(s, key)); }
+    else if (first || !(petEvt && petEvt.until > Date.now())) setLine(localLine(s, key));
   }
-  if (!pet) setLine(localLine(s, st));
-  else refreshLinePack();
+  refreshLinePack();
 }
 function petLook(){
   const s = petStatsNow || {fat: 50, muscle: 45};
@@ -3029,14 +3082,14 @@ $("#petCv").parentElement.onclick = () => {
   const st = petStatsNow ? petState(petStatsNow) : "idle";
   if (st === "sleep" || st === "hibernate"){
     const now = Date.now();
-    if (now - lastPokeLine > 8000){ lastPokeLine = now; setLine(localLine(petStatsNow, st)); }
+    if (!sayShown() || now - lastPokeLine > 8000){ lastPokeLine = now; setLine(localLine(petStatsNow, st)); }
     return;
   }
   /* a single tap is a pat; three or more quick taps get the pet's own reaction */
   const now = Date.now();
   pokes = pokes.filter(t => now - t < 2500); pokes.push(now); petPokes = pokes.length;
   /* taps and pokes take the day's AI-written lines, so they cost no request */
-  if (pokes.length < 3){ petEvent("happy", 1600); if (now - lastPokeLine > 8000){ lastPokeLine = now; setLine(localLine(petStatsNow, "happy")); } return; }
+  if (pokes.length < 3){ petEvent("happy", 1600); if (!sayShown() || now - lastPokeLine > 8000){ lastPokeLine = now; setLine(localLine(petStatsNow, "happy")); } return; }
   const r = TOUCH[petTouch()];
   petEvent(r.state, 2600);
   if (!lineBusy && now - lastPokeLine > 2500){ lastPokeLine = now; setLine(localLine(petStatsNow, r.state)); }
@@ -3047,7 +3100,7 @@ $("#petCv").parentElement.onclick = () => {
   const ctx = $("#petCv").getContext("2d");
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   let f = 0, lastTag = "", skyT = null;
-  try { const l = JSON.parse(localStorage.getItem("petLine") || "null"); if (l && l.d === todayKey() && l.t) setLine(l.t); } catch (e) {}
+  try { const l = JSON.parse(localStorage.getItem("petLine") || "null"); if (l && l.d === todayKey() && l.t) setLine(l.t, false, true); } catch (e) {}
   /* the top row of the pet's head when standing still, cached per look */
   let headKey = "", headVal = 4;
   function headRow(p, look){
@@ -3081,7 +3134,8 @@ $("#petCv").parentElement.onclick = () => {
       if (cv.width !== W * S || cv.height !== H * S){ cv.width = W * S; cv.height = H * S; cv.style.width = W * S / dpr + "px"; cv.style.height = H * S / dpr + "px"; }
       /* the pet stands a little below the top block, never lower than the free space */
       const sp = $("#petSpace").getBoundingClientRect(), toLog = y => Math.round((y - wr.top) * dpr / S);
-      const say = $("#petSay"), sayH = say.offsetHeight + 22, head = headRow(p, look);
+      /* room for a two-line bubble is kept above the head whether the pet talks or not, so the pet does not jump */
+      const say = $("#petSay"), sayH = 92, head = headRow(p, look);
       /* room above the head for the speech bubble, then the pet, then the ground */
       const ground = Math.max(32, Math.min(H - 2, toLog(sp.bottom), toLog(sp.top) + Math.ceil(sayH * dpr / S) + 34 - head + 2));
       const skyTop = toLog($(".topCard").getBoundingClientRect().bottom);
@@ -3091,14 +3145,18 @@ $("#petCv").parentElement.onclick = () => {
       const at = PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop, sky: skyT, dawn: look.tod === "morning", noThought: true});
       /* a hungry pet shows what it wants inside its own speech bubble, one component with the words */
       sayFoodIcon(look.state === "hungry" ? sayFood($("#petSayText").textContent) || look.food || "apple" : null);
-      /* the bubble sits right above the pet's head, its tail pointing down at it */
-      /* it follows the pet as it walks and hops; near a screen edge the bubble stays on screen and its tail slides over to the pet */
+      /* the bubble sits beside the pet's head, on the side with more room, its tail coming out of its side towards the head;
+         it follows the pet as it walks and hops and swaps sides when the pet gets near an edge */
       const hr = $("#hud").getBoundingClientRect(), headY = at ? wr.top + at.y * S / dpr - hr.top : wr.top + (ground - 30 + head) * S / dpr - hr.top;
       const cx = at ? wr.left + (at.x + .5) * S / dpr - hr.left : wr.left + (Math.floor((W - 48) / 2) + 24) * S / dpr - hr.left;
-      const bw = say.offsetWidth, left = Math.min(Math.max(cx, bw / 2 + 12), hr.width - bw / 2 - 12);
-      const top = Math.max(sp.top - hr.top, headY - sayH + 2);
+      const gap = 4 * S / dpr, roomR = hr.width - 12 - (cx + gap), roomL = cx - gap - 12;
+      const right = say.classList.contains("sideL") ? roomR > roomL + 40 : roomR >= roomL - 40;
+      say.classList.toggle("sideL", !right);
+      say.style.maxWidth = Math.round(Math.min(300, hr.width - 24, Math.max(190, (right ? roomR : roomL) - 18))) + "px";
+      const bw = say.offsetWidth, bh = say.offsetHeight;
+      const left = right ? Math.max(12, Math.min(cx + gap + 18, hr.width - 12 - bw)) : Math.min(hr.width - 12 - bw, Math.max(12, cx - gap - 18 - bw));
+      const top = Math.max(sp.top - hr.top, headY - bh - 6);
       say.style.top = Math.round(top) + "px"; say.style.left = Math.round(left) + "px";
-      say.style.setProperty("--tx", Math.round(Math.max(-bw / 2 + 24, Math.min(bw / 2 - 24, cx - left))) + "px"); say.style.visibility = "visible";
     }
     const tag = look.stage === "egg" ? "" : (look.toy === "dance" && look.state === "play" ? "Танцует" : STATE_TAG[look.state] || "");
     if (tag !== lastTag){ const t = $("#sceneTag"); t.hidden = !tag; t.textContent = tag; lastTag = tag; }
@@ -3108,6 +3166,31 @@ $("#petCv").parentElement.onclick = () => {
   setInterval(() => { if (!reduce || f % 6 === 0) tick(); else f++; }, 160);
   /* time moves on: hunger, night, hibernation */
   setInterval(() => { if (typeof days !== "undefined") petOnRender(); }, 60000);
+})();
+
+/* ---------- when the pet talks by itself ----------
+   Besides answering taps, meals and changes of state, the pet says something now and then while its screen is open:
+   every 2–5 minutes a line from the day's AI-written set, at most every 15 minutes a fresh AI line about the moment
+   (meal time and nothing logged for hours, late night, or just how it feels). Asleep, it mumbles half as often. */
+(() => {
+  let next = Date.now() + 2500;
+  const gap = () => (120 + Math.random() * 180) * 1000;
+  setInterval(() => {
+    const now = Date.now();
+    if (now - sayAt < 20000 && sayAt) next = Math.max(next, sayAt + gap());
+    if (now < next || document.hidden || petListening || sayShown() || lineBusy) return;
+    if ($("#screens").dataset.screen !== "pet" || $("#chatSheet").dataset.open === "true" || !$("#petMenu").hidden) return;
+    next = now + gap();
+    const s = petStatsNow || {};
+    if (!pet){ if (!hatching) setLine(localLine(s, "idle")); return; }
+    if (petDemo){ setLine(localLine(s, petDemo.state)); return; }
+    const st = petState(s), h = new Date().getHours(), asleep = st === "sleep" || st === "hibernate";
+    if (asleep && Math.random() < .5) return;
+    if (sample && now - lineAt > 15 * 60000){
+      const meal = (h >= 8 && h < 10) || (h >= 13 && h < 15) || (h >= 18 && h < 20);
+      requestLine(asleep ? "timer" : meal && !(s.sinceH < 3) ? "meal" : h >= 23 || h < 5 ? "late" : "timer", true);
+    } else setLine(localLine(s, st));
+  }, 4000);
 })();
 chatBarPreview();
 

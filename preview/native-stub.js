@@ -52,7 +52,10 @@
       if (srOn) return; srOn = true;
       js(() => sr("ready", ""));
       srTimer = setInterval(() => sr("level", String(0.3 + Math.random() * 0.6)), 120);
-      setTimeout(() => srOn && sr("partial", say[0].split(" ")[0]), 700);
+      /* the phrase comes in word by word, like the phone's recognizer does */
+      const w = say[0].split(" "); let n = 0;
+      const next = () => { if (!srOn || n >= w.length) return; sr("partial", w.slice(0, ++n).join(" ")); setTimeout(next, 450); };
+      setTimeout(next, 600);
     },
     srStop: () => { if (!srOn) return; srOn = false; clearInterval(srTimer); const t = say.shift(); say.push(t); js(() => sr("final", t)); },
     srCancel: () => { srOn = false; clearInterval(srTimer); },
