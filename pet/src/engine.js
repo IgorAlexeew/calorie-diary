@@ -483,6 +483,9 @@
     const grid = look.stage === "egg" ? egg(pet, f, look.crack || 0) : sprite(pet, {...look, moving}, f);
     const oy = 4;
     grid.forEach((row, y) => row.forEach((c, x) => { if (c){ ctx.fillStyle = c; ctx.fillRect((ox + x) * S, (oy + y) * S, S, S); } }));
+    /* where the top of the head is, in world pixels: the speech bubble follows it */
+    const headTop = Math.max(0, grid.findIndex(r => r.some(Boolean)));
+    const anchor = {x: Math.floor((W - 48) / 2) + ox + (grid.midX != null ? grid.midX : 16), y: gy - 34 + oy + headTop};
     if (grid.bubble){
       /* a see-through sleep bubble over the face: grows from the nose and pops */
       const r = [0, 1, 1, 2, 2, 3, 3, 0][(f >> 1) % 8], [bx0, by0] = grid.bubble;
@@ -514,6 +517,7 @@
     if (st === "play" && look.toy !== "dance"){ icon(ctx, "ball", bx * S, byy * S, "#E0475B", S); ctx.fillStyle = "#FFFFFF"; ctx.fillRect((bx + 1) * S, (byy + 1) * S, S, S); }
     if (st === "play" && look.toy === "dance") for (let k = 0; k < 2; k++){ const t = (f + k * 9) % 18; icon(ctx, "note", (k ? 36 : 6) * S, (18 - (t >> 1)) * S, k ? "#8A63D2" : "#3E8FD8", S * .7 | 0 || 1); }
     ctx.restore();
+    return anchor;
   }
   window.PetEngine = {PALETTES, PARTS, NAMES, FOOD, randomPet, draw, sprite, foodFor, drawFood};
 })();
