@@ -44,3 +44,7 @@
 **Локально с Android SDK:** `gradle assembleClassicRelease assemblePetRelease` (AGP 8.5, Gradle 8.7, JDK 17, нужен `python3`), APK в `build/outputs/apk/<classic|pet>/release/`.
 
 **Без Android SDK** (например, в облачном контейнере): `TOOLS=~/tools ./build.sh` (классическая, `out/classic/calorie-diary.apk`) и `FLAVOR=pet TOOLS=~/tools ./build.sh` (пиксельная, `out/pet/pixel-diary.apk`). В `TOOLS` нужны `aapt2` (npm-пакет `aaptjs3`), `android.jar` 34 (github Reginer/aosp-android-jar), `dx.jar` (Maven `com.jakewharton.android.repackaged:dalvik-dx:16.0.1`), `apksig.jar` (Maven `com.android.tools.build:apksig:2.3.0`). Подпись только v2.
+
+## Веб-превью пиксельной версии
+
+`python3 preview/build.py` собирает `preview/out/index.html`: та же страница, что в APK, но вместо Android-моста заглушка `preview/native-stub.js`. Её публикуют как Artifact на claude.ai (capability `sample` с картинками): ИИ идёт через Claude, голос подставляет пример фразы, напоминания, виджеты и выгрузка файла ничего не делают, записи хранятся только в браузере. Превью ветки develop: https://claude.ai/artifact/Vb5hi4MzZnYgV3gqzBHR5i. Для PR-ветки собирают тот же скрипт на её коде и публикуют отдельный Artifact, ссылку дают в треде.
