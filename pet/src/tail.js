@@ -234,20 +234,31 @@ $("#petCv").parentElement.onclick = () => {
       const at = PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop, sky: skyT, dawn: look.tod === "morning", noThought: true});
       /* a hungry pet shows what it wants inside its own speech bubble, one component with the words */
       sayFoodIcon(look.state === "hungry" ? sayFood($("#petSayText").textContent) || look.food || "apple" : null);
-      /* the bubble stands beside the pet, on the side with more room, its tail pointing at the pet's side at face level;
-         it follows the pet as it walks and hops and swaps sides when the pet gets near an edge */
+      /* the bubble sits up and to the side of the head, on the side with more room, its tail coming out of its side towards the mouth;
+         with no room at either side it sits over the head and the tail comes out of its bottom. It follows the pet as it walks and hops */
       const hr = $("#hud").getBoundingClientRect(), k = S / dpr, ox0 = wr.left - hr.left;
       const headY = at ? wr.top + at.y * k - hr.top : wr.top + (ground - 30 + head) * k - hr.top;
       const cx = at ? ox0 + (at.x + .5) * k : ox0 + (Math.floor((W - 48) / 2) + 24) * k;
-      const eL = at && at.l != null ? ox0 + at.l * k : cx - 12 * k, eR = at && at.r != null ? ox0 + at.r * k : cx + 12 * k;
-      const roomR = hr.width - 12 - (eR + 24), roomL = eL - 24 - 12;
-      const right = say.classList.contains("sideL") ? roomR > roomL + 40 : roomR >= roomL - 40;
-      say.classList.toggle("sideL", !right);
-      say.style.maxWidth = Math.round(Math.min(300, Math.max(120, right ? roomR : roomL))) + "px";
+      const hw = at && at.l != null ? (at.r - at.l) * k / 2 : 12 * k, tipX = hw * .45;
+      const roomR = hr.width - 12 - (cx + tipX + 21), roomL = cx - tipX - 21 - 12, MIN = 150;
+      const side = Math.max(roomR, roomL) >= MIN;
+      /* where both sides fit, it stays where it was, so it does not jump from side to side as the pet walks */
+      const right = roomR >= MIN && roomL >= MIN ? !say.classList.contains("sideL") : roomR >= roomL;
+      say.classList.toggle("sideL", !right); say.classList.toggle("above", !side);
+      say.style.maxWidth = Math.round(side ? Math.min(300, right ? roomR : roomL) : Math.min(300, hr.width - 24)) + "px";
       const bw = say.offsetWidth, bh = say.offsetHeight;
-      const left = Math.max(12, Math.min(hr.width - 12 - bw, right ? eR + 24 : eL - 24 - bw));
-      /* the tail's tip is 18 px above the bubble's bottom; it lands a little below the top of the head */
-      const top = Math.max(sp.top - hr.top, headY + 4 * k + 18 - bh);
+      let left, top;
+      if (side){
+        left = right ? cx + tipX + 21 : cx - tipX - 21 - bw;
+        top = headY - 10 - bh;
+      } else {
+        left = Math.max(12, Math.min(hr.width - 12 - bw, cx - bw / 2));
+        /* the tip lands just above the head, a little to the side of the middle, pointing down to the mouth */
+        const tl = right ? cx + tipX * .5 - left - 5 : cx - tipX * .5 - left - 25;
+        say.style.setProperty("--tl", Math.round(Math.max(0, Math.min(bw - 30, tl))) + "px");
+        top = headY - 18 - bh;
+      }
+      top = Math.max(sp.top - hr.top, top);
       say.style.top = Math.round(top) + "px"; say.style.left = Math.round(left) + "px";
     }
     const tag = look.stage === "egg" ? "" : (look.toy === "dance" && look.state === "play" ? "Танцует" : STATE_TAG[look.state] || "");
