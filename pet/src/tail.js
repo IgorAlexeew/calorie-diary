@@ -107,17 +107,28 @@ $("#barMic").onclick = startVoice;
 $("#micBtn").onclick = startVoice;
 
 /* ---------- pet menu ---------- */
-function closeMenu(){ $("#petMenu").hidden = true; }
-$("#pmClose").innerHTML = pxIcon("close", 14);
-$("#pmClose").onclick = closeMenu;
-$("#petMenu").addEventListener("click", e => { if (e.target === e.currentTarget) closeMenu(); });
+function closeMenu(){ $("#petMenu").hidden = true; $("#petDev").hidden = true; }
+$("#pmClose").innerHTML = pxIcon("close", 14); $("#pdClose").innerHTML = pxIcon("close", 14);
+$("#pmClose").onclick = closeMenu; $("#pdClose").onclick = closeMenu;
+for (const id of ["#petMenu", "#petDev"]) $(id).addEventListener("click", e => { if (e.target === e.currentTarget) closeMenu(); });
+/* the developer view (state, age and time of day previews) is hidden: 7 quick taps on «Если тыкать» open it */
+let devTaps = [];
+function devTap(){
+  const now = Date.now(); devTaps = devTaps.filter(t => now - t < 3000); devTaps.push(now);
+  if (devTaps.length >= 7){ devTaps = []; $("#petMenu").hidden = true; $("#petDev").hidden = false; }
+}
 $("#petMenuBtn").onclick = () => {
   const info = $("#pmInfo"); info.replaceChildren();
   const s = petStatsNow || petStats(), age = petAge(), stage = petStage(age), br = petBranch(s, stage);
   const rows = pet ? [["Имя", pet.name], ["Характер", pet.trait || "—"], ["Если тыкать", TOUCH[petTouch()].ru.split(":")[0]], ["Стадия", `${STAGE_RU[stage]}, дней с записями: ${age}`],
     ["Ветка", br ? `${BRANCH_RU[br][0]}: ${BRANCH_RU[br][1]}` : "появится с 7 дней"], ["Опыт", `${petXp()}, уровень ${petLevel(petXp())}`],
     ["Поколение", String(pet.gen || 1)]] : [["Яйцо", "вылупится после первой записи еды"]];
-  const dl = el("dl",{class:"pmInfo"}); for (const [a, b] of rows) dl.append(el("dt",{text:a}), el("dd",{text:b}));
+  const dl = el("dl",{class:"pmInfo"});
+  for (const [a, b] of rows){
+    const dt = el("dt",{text:a}), dd = el("dd",{text:b});
+    if (a === "Если тыкать") for (const x of [dt, dd]){ x.addEventListener("click", devTap); x.style.userSelect = "none"; }
+    dl.append(dt, dd);
+  }
   if (pet && petWords.length) dl.append(el("dt",{text:"Словарик"}), el("dd",{class:"pmWords", text: petWords.map(x => `${x.w} — ${x.m}`).join(", ")}));
   info.append(dl);
   $("#petMenu").hidden = false;
@@ -284,7 +295,7 @@ $("#petCv").parentElement.onclick = () => {
     const now = Date.now();
     if (now - sayAt < 20000 && sayAt) next = Math.max(next, sayAt + gap());
     if (now < next || document.hidden || petListening || sayShown() || lineBusy) return;
-    if ($("#screens").dataset.screen !== "pet" || $("#chatSheet").dataset.open === "true" || !$("#petMenu").hidden) return;
+    if ($("#screens").dataset.screen !== "pet" || $("#chatSheet").dataset.open === "true" || !$("#petMenu").hidden || !$("#petDev").hidden) return;
     next = now + gap();
     const s = petStatsNow || {};
     if (!pet){ if (!hatching) setLine(localLine(s, "idle")); return; }

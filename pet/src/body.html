@@ -157,17 +157,23 @@
     <div class="modalBox px">
       <div class="modalHead"><h2 id="pmTitle">Питомец</h2><button type="button" class="pxBtn" id="pmClose" aria-label="Закрыть"></button></div>
       <div class="pmInfo" id="pmInfo"></div>
-      <h3>Просмотр</h3>
-      <p class="hint">Состояние, возраст и время суток сочетаются как угодно. «Как сейчас» возвращает настоящее.</p>
+      <h3>Переродить</h3>
+      <p class="hint">Зверёк вернётся в яйцо, и ИИ соберёт нового. Записи дневника останутся.</p>
+      <button type="button" class="small danger" id="pmReroll">Переродить зверька</button>
+    </div>
+  </div>
+
+  <!-- hidden developer view: 7 taps on «Если тыкать» in the pet menu -->
+  <div class="modal" id="petDev" hidden role="dialog" aria-modal="true" aria-labelledby="pdTitle">
+    <div class="modalBox px">
+      <div class="modalHead"><h2 id="pdTitle">Просмотр</h2><button type="button" class="pxBtn" id="pdClose" aria-label="Закрыть"></button></div>
+      <p class="hint">Для разработчика. Состояние, возраст и время суток сочетаются как угодно. «Как сейчас» возвращает настоящее.</p>
       <h4>Состояние</h4>
       <div class="pmDemo" id="pmDemo"></div>
       <h4>Возраст и ветка</h4>
       <div class="pmDemo" id="pmAge"></div>
       <h4>Время суток</h4>
       <div class="pmDemo" id="pmTime"></div>
-      <h3>Переродить</h3>
-      <p class="hint">Зверёк вернётся в яйцо, и ИИ соберёт нового. Записи дневника останутся.</p>
-      <button type="button" class="small danger" id="pmReroll">Переродить зверька</button>
     </div>
   </div>
 </div>
