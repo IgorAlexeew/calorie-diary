@@ -228,7 +228,8 @@
     const ta = document.getElementById("foodText"), all = joinT(h.base, h.heard);
     if (ta){ ta.value = all; if (typeof autoGrow === "function") autoGrow(); ta.scrollTop = ta.scrollHeight; }
     const p = document.getElementById("chatPrev");
-    if (p){ p.classList.add("live", "busy"); p.classList.toggle("empty", !all); p.textContent = all || "Говори, текст появится здесь"; }
+    /* one line that never grows: the newest words stay in sight */
+    if (p){ p.classList.add("live", "busy"); p.classList.toggle("empty", !all); p.textContent = all || "Говори…"; p.scrollLeft = p.scrollWidth; }
   }
   function voiceRestore(h, msg){
     const ta = document.getElementById("foodText");
@@ -239,7 +240,7 @@
   }
   /* the cancel track: while the button is held, a lane opens to the left of it with a bin at the far end; the button's
      thumb rides along the lane under the finger, and on the bin it turns red ("отпусти — отмена") */
-  const CANCEL_PX = 140;
+  const CANCEL_PX = 120;
   const pxI = (n, sz) => typeof pxIcon === "function" ? pxIcon(n, sz) : "";
   function hintShow(h){
     const el = document.getElementById("voiceHint"); if (!el) return;
@@ -247,7 +248,10 @@
     el.style.right = Math.round(innerWidth - r.right) + "px";
     el.style.top = Math.round(r.top) + "px";
     el.style.height = Math.round(r.height) + "px";
-    el.style.width = Math.round(CANCEL_PX + r.width + 6) + "px";
+    el.style.width = Math.round(CANCEL_PX + r.width + 3) + "px";
+    /* the chat bar's text stops where the lane begins */
+    const op = document.getElementById("chatOpen");
+    if (op && h.btn.id === "barMic") op.style.paddingRight = Math.max(10, Math.round(op.getBoundingClientRect().right - (r.right - CANCEL_PX - r.width - 3) + 8)) + "px";
     el.style.setProperty("--th", Math.round(r.width) + "px");
     el.innerHTML = `<span class="vtBin">${pxI("trash", 18)}</span><span class="vtPath"><span class="vtLab"></span></span><span class="vtThumb">${pxI("mic", 18)}</span>`;
     hintArm(h, false); hintPos(0); el.hidden = false;
@@ -259,12 +263,13 @@
     const el = document.getElementById("voiceHint"); if (!el) return;
     el.classList.toggle("armed", on);
     const lab = el.querySelector(".vtLab");
-    if (lab) lab.innerHTML = on ? "Отпусти — отмена" : `${pxI("chevL", 10)}${pxI("chevL", 10)} отмена`;
+    if (lab) lab.innerHTML = on ? "Отпусти" : `${pxI("chevL", 10)}${pxI("chevL", 10)} отмена`;
     const t = el.querySelector(".vtThumb"); if (t) t.innerHTML = pxI(on ? "trash" : "mic", 18);
     for (const id of ["chatBar", "composer"]){ const b = document.getElementById(id); if (b) b.classList.toggle("voiceCancel", on); }
   }
   function hintHide(){
     const el = document.getElementById("voiceHint"); if (el) el.hidden = true;
+    const op = document.getElementById("chatOpen"); if (op) op.style.paddingRight = "";
     for (const id of ["chatBar", "composer"]){ const b = document.getElementById(id); if (b) b.classList.remove("voiceCancel"); }
   }
   function voiceMove(btn, e){
@@ -288,8 +293,10 @@
       b.style.height = Math.max(4, Math.round(x * h / 4) * 4) + "px";
     });
   }
+  let holdEndAt = 0;
   function endHold(){
     if (!hold) return null;
+    holdEndAt = Date.now();
     const h = hold; hold = null;
     petListen(false);
     const bar = document.getElementById("chatBar"); if (bar) bar.classList.remove("voiceHold");
@@ -421,17 +428,14 @@
 .pxBtn.mic.holding{animation:none;background:var(--over)}
 .pxBtn.mic.holding .vu{display:flex}
 .pxBtn.mic .vu i{display:block;width:4px;height:4px;background:#fff}
-.chatBar.voiceHold{align-items:flex-end}
-.chatBar.voiceHold .chatOpen{height:auto;min-height:44px;padding:8px 10px;align-items:flex-start}
-.chatBar.voiceHold .chatPrev{white-space:normal;overflow:visible;text-overflow:clip;font-size:17px;line-height:1.3;color:var(--fg)}
+.chatBar.voiceHold .chatPrev{text-overflow:clip;color:var(--fg)}
 .chatPrev.live::after{content:"";display:inline-block;width:2px;height:1em;margin-left:2px;vertical-align:-2px;background:currentColor;animation:vCaret 1s steps(1) infinite}
 .chatPrev.live.empty{color:var(--muted)}
 @keyframes vCaret{50%{opacity:0}}
 .voiceCancel .chatPrev,.voiceCancel textarea{opacity:.45;text-decoration:line-through}
-.chatBar.voiceHold .chatOpen{padding-bottom:52px}
 .voiceHint{position:fixed;z-index:60;display:flex;align-items:stretch;box-sizing:border-box;background:var(--bg);border:3px solid var(--line);box-shadow:2px 2px 0 rgba(0,0,0,.35);pointer-events:none;font:600 15px var(--display, inherit);color:var(--muted)}
-.voiceHint .vtBin{flex:0 0 auto;width:calc(var(--th) - 6px);display:flex;align-items:center;justify-content:center;color:var(--muted);border-right:3px dashed var(--line)}
-.voiceHint .vtPath{flex:1;display:flex;align-items:center;justify-content:flex-start;white-space:nowrap;overflow:hidden;padding:0 var(--th) 0 8px}
+.voiceHint .vtBin{flex:0 0 auto;box-sizing:border-box;width:var(--th);display:flex;align-items:center;justify-content:center;color:var(--muted);border-right:3px dashed var(--line)}
+.voiceHint .vtPath{flex:1;display:flex;align-items:center;justify-content:flex-start;white-space:nowrap;overflow:hidden;padding:0 var(--th) 0 6px;font-size:14px}
 .voiceHint .vtLab{display:inline-flex;align-items:center;gap:2px;animation:vLeft .8s steps(2) infinite}
 .voiceHint .vtThumb{position:absolute;right:-3px;top:-3px;bottom:-3px;width:var(--th);box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:var(--over);color:#fff;border:3px solid var(--line)}
 .voiceHint.armed{background:var(--over);color:#fff}
@@ -454,6 +458,8 @@
     document.addEventListener("pointermove", e => { if (hold) voiceMove(hold.btn, e); });
     document.addEventListener("pointerup", e => { if (hold) voiceUp(hold.btn, e); });
     document.addEventListener("pointercancel", e => { if (hold) voiceUp(hold.btn, e); });
+    /* letting go over the chat bar after a slide is not a tap on it: the click that follows a hold is swallowed */
+    document.addEventListener("click", e => { if (Date.now() - holdEndAt < 500){ e.preventDefault(); e.stopPropagation(); } }, true);
   }
 
   /* ---------- settings sheet ---------- */
