@@ -407,7 +407,7 @@
     heart: ["01010", "11111", "11111", "01110", "00100"],
     z: ["111", "001", "010", "100", "111"],
     apple: ["00100", "01110", "11111", "11111", "01110"],
-    drop: ["010", "111", "111", "010"],
+    drop: ["010", "010", "111", "111", "010"],
     star: ["00100", "01110", "11111", "01110", "00100"],
     note: ["00110", "00101", "00100", "11100", "11100"],
     ball: ["0110", "1111", "1111", "0110"]
@@ -525,7 +525,11 @@
     }
     if (st === "angry"){ const ax = 30, ay = 12 - (f >> 1) % 2; [[0,0],[2,0],[1,1],[0,2],[2,2]].forEach(([a, b]) => { ctx.fillStyle = "#E0475B"; ctx.fillRect((ax + a) * S, (ay + b) * S, S, S); }); if (f % 4 < 2){ ctx.fillStyle = "rgba(255,255,255,.8)"; ctx.fillRect(13 * S, 10 * S, 2 * S, S); ctx.fillRect(33 * S, 9 * S, 2 * S, S); } }
     if (st === "tickle") for (let k = 0; k < 2; k++){ const t = (f + k * 5) % 10; ctx.fillStyle = "#F5C842"; ctx.fillRect((k ? 34 : 12) * S, (16 - t) * S, S, S); ctx.fillRect((k ? 35 : 11) * S, (17 - t) * S, S, S); }
-    if (st === "sad") icon(ctx, "drop", (34 + (f % 2)) * S, 14 * S, "#6AB3F0", S * .7 | 0 || 1);
+    if (st === "sad" && rx >= 0){
+      /* a sweat drop on the temple (just below where the head gets wide, so ears and antennae don't count), sliding down the cheek and hugging its edge; full scale so it sits on the pet's pixel grid */
+      const span = r => { let a = -1, b = -1; r.forEach((c, x) => { if (c){ if (a < 0) a = x; b = x; } }); return a < 0 ? 0 : b - a + 1; }, crown = grid.findIndex(r => span(r) >= (rx - lx + 1) * .6), t = (f >> 1) % 5, ty = (crown < 0 ? headTop : crown) + 2, row = grid[ty + t] || [], tx = row.reduce((m, c, x) => c ? x : m, rx);
+      if (t < 4){ icon(ctx, "drop", (ox + tx + 1) * S, (oy + ty - 1 + t) * S, "#6AB3F0", S); ctx.fillStyle = "#FFFFFF"; ctx.fillRect((ox + tx + 1) * S, (oy + ty + 2 + t) * S, S, S); }
+    }
     if (st === "hungry" && !opts.noThought){ ctx.fillStyle = "#FFFFFF"; ctx.fillRect(33 * S, 3 * S, 12 * S, 12 * S); ctx.fillRect(31 * S, 14 * S, 2 * S, 2 * S); drawFood(ctx, look.food || "apple", 35, 5, S, 0); }
     if (st === "play" && look.toy !== "dance"){ icon(ctx, "ball", bx * S, byy * S, "#E0475B", S); ctx.fillStyle = "#FFFFFF"; ctx.fillRect((bx + 1) * S, (byy + 1) * S, S, S); }
     if (st === "play" && look.toy === "dance") for (let k = 0; k < 2; k++){ const t = (f + k * 9) % 18; icon(ctx, "note", (k ? 36 : 6) * S, (18 - (t >> 1)) * S, k ? "#8A63D2" : "#3E8FD8", S * .7 | 0 || 1); }
