@@ -93,26 +93,80 @@ function petBranch(s, stage){
   if (s.stepDays >= 3 && s.avgSteps < 3000) return "lazy";
   return "balanced";
 }
-/* time of day, whatever the pet is doing: night from bedtime (midnight if unknown) till 7:00, morning 7–9,
-   evening the 3 hours before bedtime; the menu can preview any of them */
+/* where the sun is: the city the owner named in the chat, else the main city of the phone's time zone (no location permission),
+   else the time zone's offset as longitude */
+const TZ_CITY = {"Europe/Kaliningrad":[54.71,20.51],"Europe/Moscow":[55.75,37.62],"Europe/Simferopol":[44.95,34.1],"Europe/Volgograd":[48.71,44.51],
+  "Europe/Kirov":[58.6,49.66],"Europe/Astrakhan":[46.35,48.04],"Europe/Saratov":[51.53,46.03],"Europe/Ulyanovsk":[54.32,48.4],"Europe/Samara":[53.2,50.15],
+  "Asia/Yekaterinburg":[56.84,60.6],"Asia/Omsk":[54.99,73.37],"Asia/Novosibirsk":[55.03,82.92],"Asia/Barnaul":[53.35,83.78],"Asia/Tomsk":[56.49,84.95],
+  "Asia/Novokuznetsk":[53.76,87.12],"Asia/Krasnoyarsk":[56.01,92.87],"Asia/Irkutsk":[52.29,104.28],"Asia/Chita":[52.03,113.5],"Asia/Yakutsk":[62.03,129.73],
+  "Asia/Vladivostok":[43.12,131.89],"Asia/Sakhalin":[46.96,142.73],"Asia/Magadan":[59.56,150.8],"Asia/Kamchatka":[53.02,158.65],
+  "Europe/Minsk":[53.9,27.57],"Europe/Kyiv":[50.45,30.52],"Europe/Kiev":[50.45,30.52],"Europe/Chisinau":[47.01,28.86],"Europe/Riga":[56.95,24.11],
+  "Europe/Vilnius":[54.69,25.28],"Europe/Tallinn":[59.44,24.75],"Europe/Helsinki":[60.17,24.94],"Europe/Warsaw":[52.23,21.01],"Europe/Berlin":[52.52,13.4],
+  "Europe/Prague":[50.08,14.44],"Europe/Vienna":[48.21,16.37],"Europe/Belgrade":[44.79,20.45],"Europe/Istanbul":[41.01,28.98],"Europe/Paris":[48.86,2.35],
+  "Europe/Madrid":[40.42,-3.7],"Europe/Rome":[41.9,12.5],"Europe/Amsterdam":[52.37,4.9],"Europe/London":[51.51,-.13],"Europe/Lisbon":[38.72,-9.14],
+  "Asia/Tbilisi":[41.72,44.79],"Asia/Yerevan":[40.18,44.51],"Asia/Baku":[40.41,49.87],"Asia/Almaty":[43.24,76.89],"Asia/Astana":[51.17,71.45],
+  "Asia/Tashkent":[41.3,69.24],"Asia/Bishkek":[42.87,74.59],"Asia/Dushanbe":[38.56,68.79],"Asia/Dubai":[25.2,55.27],"Asia/Bangkok":[13.76,100.5],
+  "Asia/Shanghai":[31.23,121.47],"Asia/Tokyo":[35.68,139.69],"America/New_York":[40.71,-74.01],"America/Chicago":[41.88,-87.63],"America/Los_Angeles":[34.05,-118.24]};
+function petPlace(){
+  const m = /^(.*);(-?[\d.]+);(-?[\d.]+)$/.exec(settings.place || "");
+  if (m) return {name: m[1], lat: +m[2], lon: +m[3]};
+  let tz = ""; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) {}
+  if (TZ_CITY[tz]) return {name: tz.split("/").pop().replace(/_/g, " "), lat: TZ_CITY[tz][0], lon: TZ_CITY[tz][1], guess: true};
+  return {name: "", lat: 52, lon: -new Date().getTimezoneOffset() / 4, guess: true};
+}
+/* today's sunrise and sunset in local hours (the usual sunrise equation, a minute or two off at most);
+   in a polar night or day there is none */
+function sunTimes(day, lat, lon){
+  const rad = Math.PI / 180, noon = new Date(day); noon.setHours(12, 0, 0, 0);
+  const n = Math.round(noon / 864e5 + 2440587.5 - 2451545 + .0008), J = n - lon / 360;
+  const M = (357.5291 + .98560028 * J) % 360, C = 1.9148 * Math.sin(M * rad) + .02 * Math.sin(2 * M * rad) + .0003 * Math.sin(3 * M * rad);
+  const L = (M + C + 282.9372) % 360, T = 2451545 + J + .0053 * Math.sin(M * rad) - .0069 * Math.sin(2 * L * rad);
+  const sd = Math.sin(L * rad) * Math.sin(23.4397 * rad), cd = Math.cos(Math.asin(sd));
+  const w = (Math.sin(-.833 * rad) - Math.sin(lat * rad) * sd) / (Math.cos(lat * rad) * cd);
+  if (w > 1) return {rise: 12, set: 12, polar: "night"};
+  if (w < -1) return {rise: 0, set: 24, polar: "day"};
+  const o = Math.acos(w) / rad / 360, at = j => { const d = new Date((j - 2440587.5) * 864e5); return d.getHours() + d.getMinutes() / 60; };
+  return {rise: at(T - o), set: at(T + o)};
+}
+let sunCache = null;
+function sunToday(){
+  const p = petPlace(), k = todayKey() + p.lat + p.lon;
+  if (!sunCache || sunCache.k !== k) sunCache = {k, place: p, ...sunTimes(new Date(), p.lat, p.lon)};
+  return sunCache;
+}
+function bedHour(){
+  const bt = /^(\d{1,2}):(\d{2})$/.exec(settings.bedtime || "");
+  let b = bt ? +bt[1] + +bt[2] / 60 : 0; if (b < 12) b += 24;
+  return b;
+}
+/* time of day follows the sun: the pet sleeps from bedtime (midnight if unknown) till sunrise, but wakes no earlier than 5 and no
+   later than 9; morning is the first two and a half hours after that, evening starts an hour before sunset (or three hours before
+   bedtime, if that is earlier, but not before 15:00); the menu can preview any of them */
 function petTod(s){
   if (petTimeDemo) return petTimeDemo;
   if (s.hour == null) return "day";
   if (isNight(s.hour)) return "night";
-  const bt = /^(\d{1,2}):(\d{2})$/.exec(settings.bedtime || "");
-  let b = bt ? +bt[1] + +bt[2] / 60 : 0; if (b < 12) b += 24;
-  const h = s.hour < 7 ? s.hour + 24 : s.hour;
-  if (h >= 7 && h < 9) return "morning";
-  return h >= b - 3 ? "evening" : "day";
+  const sun = sunToday(), wake = Math.min(9, Math.max(5, sun.rise)), b = bedHour();
+  const h = s.hour < wake ? s.hour + 24 : s.hour;
+  if (h < wake + 2.5) return "morning";
+  return h >= Math.max(15, Math.min(sun.set - 1, b - 3)) ? "evening" : "day";
+}
+function isNight(hour){
+  const wake = Math.min(9, Math.max(5, sunToday().rise)), h = hour < 12 ? hour + 24 : hour;
+  return h >= bedHour() && h < wake + 24;
+}
+/* how dark the sky is, 0 day … .5 the sun on the horizon … 1 night, from the real sun: it brightens and darkens over the
+   three quarters of an hour either side of sunrise and sunset; dawn is the morning half of the day */
+function petSky(s){
+  if (petTimeDemo) return {sky: {morning: .5, day: 0, evening: .5, night: 1}[petTimeDemo], dawn: petTimeDemo === "morning"};
+  if (s.hour == null) return {sky: 0, dawn: false};
+  const sun = sunToday(), h = s.hour, dawn = h < (sun.rise + sun.set) / 2;
+  if (sun.polar) return {sky: sun.polar === "night" ? (Math.abs(h - 12) < 2 ? .75 : 1) : 0, dawn};
+  const ramp = x => Math.min(1, Math.max(0, (x + .75) / 1.5));
+  return {sky: dawn ? 1 - ramp(h - sun.rise) : ramp(h - sun.set), dawn};
 }
 const TOD_RU = {morning: "утро", day: "день", evening: "вечер", night: "ночь"};
 function petNight(s){ return petTod(s) === "night"; }
-function isNight(hour){
-  const bt = /^(\d{1,2}):(\d{2})$/.exec(settings.bedtime || "");
-  let b = bt ? +bt[1] + +bt[2] / 60 : 0; if (b < 12) b += 24;
-  const h = hour < 12 ? hour + 24 : hour;
-  return h >= b && h < 31;
-}
 /* base: the lasting state, without short events (eating, a pat, a poke) and the menu demo */
 function petState(s, base){
   const now = Date.now();
@@ -488,7 +542,7 @@ function petLook(){
     return {pet: {palette: hatching ? hatching.palette : "mint"}, look: {stage: "egg", crack, state: "idle"}};
   }
   const st = petStatsNow ? petState(s) : "idle", stage = petStage(petAge());
-  const look = {state: st, fat: s.fat, muscle: s.muscle, branch: petBranch(s, stage), stage, toy: petToy(), tod: petTod(s), night: petTod(s) === "night"};
+  const look = {state: st, fat: s.fat, muscle: s.muscle, branch: petBranch(s, stage), stage, toy: petToy(), tod: petTod(s), night: petTod(s) === "night", ...petSky(s)};
   const now = Date.now(), ev = petDemo && petDemo.until > now ? petDemo : petEvt && petEvt.until > now ? petEvt : null;
   /* a menu preview eats in a loop; a real meal once */
   if (ev && ev.food){ look.food = ev.food; look.eatT = ev.loop ? ((now - ev.start) % ev.dur) / ev.dur : 1 - (ev.until - now) / (ev.dur || 4500); }

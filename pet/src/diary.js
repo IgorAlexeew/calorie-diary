@@ -742,6 +742,7 @@ ${c.detail.length ? c.detail.map(x => "- " + x).join("\n") : "- пока нет"
 - steps — шаги за день итогом. Если человек говорит «ещё N шагов», верни прежние + N.
 - weight — вес в кг.
 - bedtime — во сколько ложится спать, ЧЧ:ММ.
+- place — город, где живёт человек, если он его назвал («я в Казани», «живу в Питере»): название и координаты, по ним зверёк просыпается с восходом и засыпает с закатом.
 - recipes — если человек просит идею, рецепт или спрашивает, что поесть. 1–3 рецепта на одну порцию с весом и КБЖУ ингредиентов, шагами и коротким поисковым запросом по-русски. В первую очередь русская и домашняя кухня, обычные продукты. Подбирай под состояние: если давно не ел или впереди долгий вечер — сытное, белковое, объёмное, с клетчаткой; ближе ко сну — лёгкое, но сытное; если калорий мало — объёмное низкокалорийное или раздели на два приёма; если жиров много — без масла, майонеза, сыра, колбасы. Время сна не придумывай: если оно неизвестно и важно для совета, коротко спроси в тексте и дай совет с оговоркой.
 Если непонятно, съел человек или только собирается, или какую запись править, ничего не записывай, а коротко спроси в тексте.
 
@@ -756,6 +757,7 @@ ${c.detail.length ? c.detail.map(x => "- " + x).join("\n") : "- пока нет"
 {"type":"steps","steps":9000}
 {"type":"weight","kg":99.4}
 {"type":"bedtime","time":"01:00"}
+{"type":"place","name":"Казань","lat":55.79,"lon":49.12}
 {"type":"recipes","items":[{"title":"…","why":"почему подходит сейчас, до 12 слов","time":20,"ingredients":[{"name":"…","grams":150,"kcal":165,"p":35,"f":3,"c":0}],"steps":["…"],"search":"…"}]}
 Если действий нет, пиши только status и text. Каждый объект, даже большой рецепт, пиши целиком в одну строку, без переносов внутри. Числа целые, кроме веса.${petChatRules()}`;
 }
@@ -812,6 +814,13 @@ async function applyActions(dk, acts, photoIds, userText){
       settings = {...settings, bedtime: tm};
       enqueue(() => db.collection("meta").doc("settings").set(settings));
       out.push({type, state:"done", time: tm, prevB});
+    } else if (type === "place"){
+      const name = str(a.name, 40).replace(/;/g, ","), lat = +a.lat, lon = +a.lon;
+      if (!name || !(Math.abs(lat) <= 90 && Math.abs(lon) <= 180)) continue;
+      const prevPl = settings.place || "";
+      settings = {...settings, place: `${name};${lat.toFixed(2)};${lon.toFixed(2)}`};
+      enqueue(() => db.collection("meta").doc("settings").set(settings));
+      out.push({type, state:"done", name, prevPl});
     } else if (type === "recipes"){
       const items = Array.isArray(a.items) ? a.items.slice(0, 3) : [];
       if (items.length) out.push({type, state:"info", items});
@@ -831,6 +840,7 @@ async function undoAction(dk, mi, ai){
   else if (a.type === "steps"){ activity = {...activity, [dk]: {steps: a.prevSteps || 0}}; enqueue(() => db.collection("activity").doc(dk).set({steps: a.prevSteps || 0})); render(); }
   else if (a.type === "weight"){ const w = {...weights}; if (a.prevW == null) delete w[dk]; else w[dk] = a.prevW; weights = w; enqueue(() => db.collection("meta").doc("weights").set({byDate: weights})); render(); }
   else if (a.type === "bedtime"){ settings = {...settings, bedtime: a.prevB || ""}; enqueue(() => db.collection("meta").doc("settings").set(settings)); render(); }
+  else if (a.type === "place"){ settings = {...settings, place: a.prevPl || ""}; enqueue(() => db.collection("meta").doc("settings").set(settings)); render(); }
   a.state = "undone";
   await saveChat(dk, msgs);
 }
@@ -853,6 +863,7 @@ function actionSummary(a){
   if (a.type === "steps") return `шаги: ${a.steps}`;
   if (a.type === "weight") return `вес: ${a.kg} кг`;
   if (a.type === "bedtime") return `время сна: ${a.time}`;
+  if (a.type === "place") return `город: ${a.name}`;
   if (a.type === "recipes") return "предложил рецепты: " + a.items.map(x => x.title).join("; ");
   return "";
 }
@@ -912,7 +923,7 @@ function updateLive(){
 }
 function actCard(dk, mi, ai, a){
   const canUndo = mi >= 0 && a.state === "done" && a.type !== "recipes";
-  const labels = {add_meal: "Записано · " + MEALS[clampMeal(a.meal)].toLowerCase(), edit_meal: "Исправлено", delete_meal: "Удалено", steps: "Шаги", weight: "Вес", bedtime: "Время сна"};
+  const labels = {add_meal: "Записано · " + MEALS[clampMeal(a.meal)].toLowerCase(), edit_meal: "Исправлено", delete_meal: "Удалено", steps: "Шаги", weight: "Вес", bedtime: "Время сна", place: "Город"};
   let body;
   if (a.type === "add_meal" || a.type === "edit_meal" || a.type === "delete_meal"){
     const obj = {kcal: a.kcal, p: a.p != null ? a.p : (a.prev && a.prev.p), f: a.f != null ? a.f : (a.prev && a.prev.f), c: a.c != null ? a.c : (a.prev && a.prev.c), grams: a.grams || (a.prev ? sumGrams(a.prev.items || []) : 0)};
@@ -925,6 +936,8 @@ function actCard(dk, mi, ai, a){
     body = el("div",{class:"actRow"}, el("span",{class:"actTitle num",text: String(a.kg).replace(".",",") + " кг"}), el("span",{class:"actSub",text: a.prevW != null ? `было ${String(a.prevW).replace(".",",")} кг` : ""}));
   } else if (a.type === "bedtime"){
     body = el("div",{class:"actRow"}, el("span",{class:"actTitle num",text: "Ложусь в " + a.time}), el("span",{class:"actSub",text:"учту в советах"}));
+  } else if (a.type === "place"){
+    body = el("div",{class:"actRow"}, el("span",{class:"actTitle",text: a.name}), el("span",{class:"actSub",text:"восход и закат отсюда"}));
   } else if (a.type === "recipes"){
     const box = el("div",{class:"recipes"});
     a.items.forEach((r, k) => box.append(recipeCard(r, dk, `${mi >= 0 && chatMsgs(dk)[mi] ? chatMsgs(dk)[mi].id : "live"}:${k}`)));
@@ -1149,7 +1162,7 @@ function onSetting(){
     const protein = Math.min(300, Math.max(40, +$("#tProt").value || 140));
     const goal = Math.min(200, Math.max(40, +$("#tGoal").value || 80));
     if (kcal === +settings.target && protein === +settings.protein && goal === +settings.goal) return;
-    settings = {target:kcal, protein, goal, bedtime: settings.bedtime || ""};
+    settings = {target:kcal, protein, goal, bedtime: settings.bedtime || "", place: settings.place || ""};
     render();
     if (db) enqueue(() => db.collection("meta").doc("settings").set(settings));
   }, 700);
@@ -1187,7 +1200,7 @@ render();
   db.collection("meta").onSnapshot(snap => {
     for (const doc of snap.docs){
       const b = doc.data() || {};
-      if (doc.id === "settings") settings = {target: +b.target || 1800, protein: +b.protein || 140, goal: +b.goal || 80, bedtime: String(b.bedtime || "")};
+      if (doc.id === "settings") settings = {target: +b.target || 1800, protein: +b.protein || 140, goal: +b.goal || 80, bedtime: String(b.bedtime || ""), place: String(b.place || "")};
       if (doc.id === "weights") weights = b.byDate || {};
     }
     render();
