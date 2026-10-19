@@ -8,7 +8,8 @@
   const aborts = new Map();
   const toBlob = url => fetch(url).then(r => r.blob());
   async function run(id, body, stream){
-    const host = window.claude;               // the claude.ai Artifact runtime, absent elsewhere
+    /* the claude.ai Artifact runtime, absent elsewhere; the app runs in a phone-sized frame, so the runtime is the outer page's */
+    const host = window.claude || (parent !== window ? parent.claude : null);
     const sample = host && host.use ? await host.use("sample") : null;
     if (!sample) return window.__native.fail(id, "network", "В превью ИИ работает только на claude.ai");
     if ((body.messages || []).some(m => Array.isArray(m.content) && m.content.some(p => p.type === "input_audio")))
