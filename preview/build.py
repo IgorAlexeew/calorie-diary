@@ -33,7 +33,7 @@ s = ('<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="vie
      '@media (min-width:560px) and (min-height:600px){#phone{inset:auto;left:50%;top:50%;width:390px;height:min(844px,calc(100% - 40px));transform:translate(-50%,-50%);'
      'border:10px solid #111;border-radius:28px;box-shadow:0 10px 40px rgba(0,0,0,.5)}}</style></head><body>'
      '<iframe id="phone" title="Пиксельный дневник"></iframe>' + badge +
-     '<script>document.getElementById("phone").srcdoc = ' + app + ';</script></body></html>')
+     '<script>' + rd("preview/outer.js") + '\ndocument.getElementById("phone").srcdoc = ' + app + ';</script></body></html>')
 os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
 open(out, "w", encoding="utf-8").write(s)
 print("preview", out, len(s))
