@@ -88,7 +88,8 @@ h3{font-size:16px;margin:6px 0 0}
 .topBtns{position:absolute;top:8px;right:8px;display:flex;gap:6px}
 .idLine{margin-right:88px;min-height:38px}
 .topBtns .pxBtn{width:38px;height:38px;border-width:2px;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.35)}
-.idLine .streak{color:var(--over)}
+.topBtns .streak{display:inline-flex;align-items:center;gap:3px;margin-right:2px;color:var(--over);font:600 18px var(--display)}
+.topBtns .streak[hidden]{display:none}
 /* the pet's line: a white speech bubble beside the pet's head, its pixel tail coming out of its side towards the head;
    hidden until the pet says something (.show), then it pops up and the line types in letter by letter */
 .hudTop{display:flex;flex-direction:column;gap:10px}
@@ -208,15 +209,14 @@ svg text{font-size-adjust:.5!important}
 /* the id block: the name on top, then one line with stage, state and streak; on a narrow phone the stage text shortens, the state never wraps;
    both lines stop short of the two buttons, so the streak never slides under them */
 .idLine{display:flex;flex-direction:column;align-items:stretch;gap:2px;min-width:0;margin-right:0}
-.idLine b{max-width:calc(100% - 88px);box-sizing:border-box}
+.idLine b{max-width:calc(100% - var(--btnsW, 88px));box-sizing:border-box}
 .idLine b{line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .idMeta{display:flex;align-items:baseline;gap:8px;min-width:0;width:calc(100% - 88px);overflow:hidden;white-space:nowrap;line-height:1.2}
 .idMeta #petStage{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .idMeta .sceneTag{flex-shrink:0;padding:0 6px}
-.idMeta .streak{flex-shrink:0;margin-left:auto;display:inline-flex;align-items:baseline;gap:3px}
 .idMeta [hidden]{display:none!important}
-.idLine .streak svg{align-self:center}
 .say .fx{color:#8A8C93}
 .pmInfo dd.pmWords{color:var(--muted)}
 .sayIco{width:26px;height:26px;image-rendering:pixelated;flex-shrink:0;margin-right:8px}
 .modalBox h4{margin:10px 0 6px;font-family:var(--display);font-size:16px;font-weight:400;color:var(--muted)}
+.topCard:has(#streak:not([hidden])) .idLine b{--btnsW:136px}
