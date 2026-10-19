@@ -115,7 +115,7 @@ select:hover{border-color:var(--accent)}
 .actDot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex-shrink:0}
 .act.edit_meal .actDot{background:var(--accent)}
 .act.delete_meal .actDot{background:var(--over)}
-.act.steps .actDot,.act.weight .actDot,.act.bedtime .actDot{background:var(--m-c)}
+.act.steps .actDot,.act.weight .actDot,.act.bedtime .actDot,.act.place .actDot{background:var(--m-c)}
 .act[data-state="undone"]{opacity:.55}
 .act[data-state="undone"] .actDot{background:var(--muted)}
 .act[data-state="undone"] .actTitle{text-decoration:line-through}
@@ -124,7 +124,7 @@ select:hover{border-color:var(--accent)}
 .undo{border:0;background:transparent;color:var(--accent);font-size:12px;padding:2px 4px;border-radius:6px}
 .undo:hover{background:var(--accent-soft)}
 .actRow{display:grid;grid-template-columns:minmax(0,1fr) 56px 84px;column-gap:12px;align-items:center}
-.act.steps .actRow,.act.weight .actRow,.act.bedtime .actRow{grid-template-columns:minmax(0,1fr) auto}
+.act.steps .actRow,.act.weight .actRow,.act.bedtime .actRow,.act.place .actRow{grid-template-columns:minmax(0,1fr) auto}
 .actRow .kcalBtn,.actRow .actSub{justify-self:end}
 .actTitle{font-weight:600;min-width:0;overflow-wrap:anywhere}
 .actSub{margin:0;font-size:12px;color:var(--muted)}

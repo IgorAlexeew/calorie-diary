@@ -259,10 +259,10 @@ $("#petCv").parentElement.onclick = () => {
       /* with the chat open, the pet stands on top of it, so it stays in sight above the chat */
       const sh = $("#chatSheet"); if (sh.dataset.open === "true") ground = Math.max(24, Math.min(ground, toLog(sh.getBoundingClientRect().top) - 1));
       const skyTop = toLog($(".topCard").getBoundingClientRect().bottom);
-      /* day and night swap through a sunset, one step every few frames */
-      const want = {morning: .5, day: 0, evening: .5, night: 1}[look.tod] ?? (look.night ? 1 : 0);
+      /* the sky follows the real sun, one step every few frames */
+      const want = look.sky ?? ({morning: .5, day: 0, evening: .5, night: 1}[look.tod] ?? (look.night ? 1 : 0));
       if (skyT === null) skyT = want; else if (skyT !== want) skyT = want > skyT ? Math.min(want, skyT + 1 / 64) : Math.max(want, skyT - 1 / 64);
-      const at = PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop, sky: skyT, dawn: look.tod === "morning", noThought: true});
+      const at = PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop, sky: skyT, dawn: look.dawn ?? look.tod === "morning", noThought: true});
       /* a hungry pet shows what it wants inside its own speech bubble, one component with the words */
       sayFoodIcon(look.state === "hungry" ? sayFood($("#petSayText").textContent) || look.food || "apple" : null);
       /* the bubble sits up and to the side of the head, on the side with more room, its tail coming out of its side towards the mouth;
