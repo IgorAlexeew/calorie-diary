@@ -238,13 +238,16 @@ $("#petCv").parentElement.onclick = () => {
          it follows the pet as it walks and hops and swaps sides when the pet gets near an edge */
       const hr = $("#hud").getBoundingClientRect(), headY = at ? wr.top + at.y * S / dpr - hr.top : wr.top + (ground - 30 + head) * S / dpr - hr.top;
       const cx = at ? wr.left + (at.x + .5) * S / dpr - hr.left : wr.left + (Math.floor((W - 48) / 2) + 24) * S / dpr - hr.left;
-      const gap = 4 * S / dpr, roomR = hr.width - 12 - (cx + gap), roomL = cx - gap - 12;
+      /* the tail's tip (24 px wide, slanting 18 px down) lands on the top of the head; the bubble goes to the side with more room */
+      const roomR = hr.width - 12 - (cx - 10), roomL = cx + 10 - 12;
       const right = say.classList.contains("sideL") ? roomR > roomL + 40 : roomR >= roomL - 40;
       say.classList.toggle("sideL", !right);
-      say.style.maxWidth = Math.round(Math.min(300, hr.width - 24, Math.max(190, (right ? roomR : roomL) - 18))) + "px";
+      say.style.maxWidth = Math.round(Math.min(300, hr.width - 24, Math.max(190, (right ? roomR : roomL)))) + "px";
       const bw = say.offsetWidth, bh = say.offsetHeight;
-      const left = right ? Math.max(12, Math.min(cx + gap + 18, hr.width - 12 - bw)) : Math.min(hr.width - 12 - bw, Math.max(12, cx - gap - 18 - bw));
-      const top = Math.max(sp.top - hr.top, headY - bh - 6);
+      const left = Math.max(12, Math.min(hr.width - 12 - bw, right ? cx - 10 : cx + 10 - bw));
+      const tl = Math.max(0, Math.min(bw - 30, right ? cx - left - 5 : cx - left - 25));
+      say.style.setProperty("--tl", Math.round(tl) + "px");
+      const top = Math.max(sp.top - hr.top, headY - bh - 16);
       say.style.top = Math.round(top) + "px"; say.style.left = Math.round(left) + "px";
     }
     const tag = look.stage === "egg" ? "" : (look.toy === "dance" && look.state === "play" ? "Танцует" : STATE_TAG[look.state] || "");
