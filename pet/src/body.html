@@ -15,9 +15,9 @@
           <span class="idMeta">
             <span id="petStage">ждёт первой записи</span>
             <span class="sceneTag" id="sceneTag" hidden></span>
-            <span class="streak num" id="streak" hidden></span>
           </span>
           <span class="topBtns">
+            <span class="streak num" id="streak" hidden></span>
             <button type="button" class="pxBtn" id="toDiary" aria-label="Дневник"></button>
             <button type="button" class="pxBtn" id="petMenuBtn" aria-label="Меню питомца"></button>
           </span>
@@ -157,17 +157,24 @@
     <div class="modalBox px">
       <div class="modalHead"><h2 id="pmTitle">Питомец</h2><button type="button" class="pxBtn" id="pmClose" aria-label="Закрыть"></button></div>
       <div class="pmInfo" id="pmInfo"></div>
-      <h3>Просмотр</h3>
-      <p class="hint">Состояние, возраст и время суток сочетаются как угодно. «Как сейчас» возвращает настоящее.</p>
+      <h3>Переродить</h3>
+      <p class="hint">Зверёк вернётся в яйцо, и ИИ соберёт нового. Записи дневника останутся.</p>
+      <button type="button" class="small danger" id="pmReroll">Переродить зверька</button>
+    </div>
+  </div>
+
+  <!-- developer view: opened by the «Просмотр» button on the state panel, which 7 taps on «Если тыкать» in the pet menu turn on -->
+  <div class="modal" id="petDev" hidden role="dialog" aria-modal="true" aria-labelledby="pdTitle">
+    <div class="modalBox px">
+      <div class="modalHead"><h2 id="pdTitle">Просмотр</h2><button type="button" class="pxBtn" id="pdClose" aria-label="Закрыть"></button></div>
+      <p class="hint">Для разработчика. Состояние, возраст и время суток сочетаются как угодно. «Как сейчас» возвращает настоящее.</p>
       <h4>Состояние</h4>
       <div class="pmDemo" id="pmDemo"></div>
       <h4>Возраст и ветка</h4>
       <div class="pmDemo" id="pmAge"></div>
       <h4>Время суток</h4>
       <div class="pmDemo" id="pmTime"></div>
-      <h3>Переродить</h3>
-      <p class="hint">Зверёк вернётся в яйцо, и ИИ соберёт нового. Записи дневника останутся.</p>
-      <button type="button" class="small danger" id="pmReroll">Переродить зверька</button>
+      <button type="button" class="small" id="pdOff">Выключить режим разработчика</button>
     </div>
   </div>
 </div>

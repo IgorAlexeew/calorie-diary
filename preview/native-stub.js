@@ -8,9 +8,10 @@
   const aborts = new Map();
   const toBlob = url => fetch(url).then(r => r.blob());
   async function run(id, body, stream){
-    const host = window.claude;               // the claude.ai Artifact runtime, absent elsewhere
-    const sample = host && host.use ? await host.use("sample") : null;
-    if (!sample) return window.__native.fail(id, "network", "В превью ИИ работает только на claude.ai");
+    /* the claude.ai Artifact runtime lives in the outer page (the app runs in a phone-sized frame); the call is made there
+       by __pvSample, so its options are that page's own plain objects (the runtime rejects objects made in this frame) */
+    const outer = parent !== window && parent.__pvSample ? parent : window;
+    if (!outer.__pvSample || !(outer.claude && outer.claude.use)) return window.__native.fail(id, "network", "В превью ИИ работает только на claude.ai");
     if ((body.messages || []).some(m => Array.isArray(m.content) && m.content.some(p => p.type === "input_audio")))
       return window.__native.fail(id, "bad_model", "голос через ИИ в превью отключён");
     let sys = "", images = [];
@@ -25,10 +26,10 @@
       else msgs.push({role: m.role === "assistant" ? "assistant" : "user", content: String(t)});
     }
     if (sys && msgs.length) msgs[0].content = sys + msgs[0].content;
-    const ac = new AbortController(); aborts.set(id, ac);
+    const call = outer.__pvSample(JSON.stringify(msgs), images, stream ? delta => window.__native.chunk(id, delta) : null);
+    aborts.set(id, call);
     try {
-      const r = await sample(msgs, {signal: ac.signal, cache: false, images: images.length ? images : undefined,
-        onText: stream ? ({delta}) => delta && window.__native.chunk(id, delta) : undefined});
+      const r = await call.done;
       window.__native.done(id, stream ? r.text : JSON.stringify({choices: [{message: {content: r.text}}]}));
     } catch (e) {
       window.__native.fail(id, e && e.code === "aborted" ? "cancelled" : "http", (e && (e.message || e.code)) || "ошибка");
@@ -52,7 +53,10 @@
       if (srOn) return; srOn = true;
       js(() => sr("ready", ""));
       srTimer = setInterval(() => sr("level", String(0.3 + Math.random() * 0.6)), 120);
-      setTimeout(() => srOn && sr("partial", say[0].split(" ")[0]), 700);
+      /* the phrase comes in word by word, like the phone's recognizer does */
+      const w = say[0].split(" "); let n = 0;
+      const next = () => { if (!srOn || n >= w.length) return; sr("partial", w.slice(0, ++n).join(" ")); setTimeout(next, 450); };
+      setTimeout(next, 600);
     },
     srStop: () => { if (!srOn) return; srOn = false; clearInterval(srTimer); const t = say.shift(); say.push(t); js(() => sr("final", t)); },
     srCancel: () => { srOn = false; clearInterval(srTimer); },

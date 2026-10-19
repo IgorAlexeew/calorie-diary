@@ -107,17 +107,46 @@ $("#barMic").onclick = startVoice;
 $("#micBtn").onclick = startVoice;
 
 /* ---------- pet menu ---------- */
-function closeMenu(){ $("#petMenu").hidden = true; }
-$("#pmClose").innerHTML = pxIcon("close", 14);
-$("#pmClose").onclick = closeMenu;
-$("#petMenu").addEventListener("click", e => { if (e.target === e.currentTarget) closeMenu(); });
+function closeMenu(){ $("#petMenu").hidden = true; $("#petDev").hidden = true; }
+$("#pmClose").innerHTML = pxIcon("close", 14); $("#pdClose").innerHTML = pxIcon("close", 14);
+$("#pmClose").onclick = closeMenu; $("#pdClose").onclick = closeMenu;
+for (const id of ["#petMenu", "#petDev"]) $(id).addEventListener("click", e => { if (e.target === e.currentTarget) closeMenu(); });
+/* developer mode (state, age and time of day previews): 7 quick taps on «Если тыкать» in the pet menu turn it on,
+   then a «Просмотр» button sits in the free cell of the state panel and opens the preview window; it can be turned off there */
+const devOn = () => { try { return localStorage.getItem("petDevMode") === "1"; } catch (e) { return false; } };
+function devSet(on){ try { localStorage.setItem("petDevMode", on ? "1" : ""); } catch (e) {} devSync(); }
+function devSync(){
+  const box = $("#petStats"); if (!box.children.length) return;
+  let b = $("#devBtn");
+  if (!b){
+    b = el("button",{type:"button", class:"devBtn", id:"devBtn"}); b.innerHTML = pxIcon("edit", 14) + "<span>Просмотр</span>";
+    b.onclick = () => { $("#petDev").hidden = false; };
+    box.append(b);
+  }
+  b.hidden = !devOn();
+}
+let devTaps = [];
+function devTap(){
+  const now = Date.now(); devTaps = devTaps.filter(t => now - t < 3000); devTaps.push(now);
+  if (devTaps.length < 7) return;
+  devTaps = [];
+  const was = devOn(); devSet(true);
+  const old = $("#petMenu .devNote"); if (old) old.remove();
+  $("#pmInfo").after(el("p",{class:"hint devNote", text: was ? "Режим разработчика уже включён: кнопка «Просмотр» на панели состояния." : "Режим разработчика включён: кнопка «Просмотр» теперь на панели состояния."}));
+}
+$("#pdOff").onclick = () => { devSet(false); closeMenu(); };
 $("#petMenuBtn").onclick = () => {
-  const info = $("#pmInfo"); info.replaceChildren();
+  const info = $("#pmInfo"); info.replaceChildren(); const note = $("#petMenu .devNote"); if (note) note.remove();
   const s = petStatsNow || petStats(), age = petAge(), stage = petStage(age), br = petBranch(s, stage);
   const rows = pet ? [["Имя", pet.name], ["Характер", pet.trait || "—"], ["Если тыкать", TOUCH[petTouch()].ru.split(":")[0]], ["Стадия", `${STAGE_RU[stage]}, дней с записями: ${age}`],
     ["Ветка", br ? `${BRANCH_RU[br][0]}: ${BRANCH_RU[br][1]}` : "появится с 7 дней"], ["Опыт", `${petXp()}, уровень ${petLevel(petXp())}`],
     ["Поколение", String(pet.gen || 1)]] : [["Яйцо", "вылупится после первой записи еды"]];
-  const dl = el("dl",{class:"pmInfo"}); for (const [a, b] of rows) dl.append(el("dt",{text:a}), el("dd",{text:b}));
+  const dl = el("dl",{class:"pmInfo"});
+  for (const [a, b] of rows){
+    const dt = el("dt",{text:a}), dd = el("dd",{text:b});
+    if (a === "Если тыкать") for (const x of [dt, dd]){ x.addEventListener("click", devTap); x.style.userSelect = "none"; }
+    dl.append(dt, dd);
+  }
   if (pet && petWords.length) dl.append(el("dt",{text:"Словарик"}), el("dd",{class:"pmWords", text: petWords.map(x => `${x.w} — ${x.m}`).join(", ")}));
   info.append(dl);
   $("#petMenu").hidden = false;
@@ -171,14 +200,14 @@ $("#petCv").parentElement.onclick = () => {
   const st = petStatsNow ? petState(petStatsNow) : "idle";
   if (st === "sleep" || st === "hibernate"){
     const now = Date.now();
-    if (now - lastPokeLine > 8000){ lastPokeLine = now; setLine(localLine(petStatsNow, st)); }
+    if (!sayShown() || now - lastPokeLine > 8000){ lastPokeLine = now; setLine(localLine(petStatsNow, st)); }
     return;
   }
   /* a single tap is a pat; three or more quick taps get the pet's own reaction */
   const now = Date.now();
   pokes = pokes.filter(t => now - t < 2500); pokes.push(now); petPokes = pokes.length;
   /* taps and pokes take the day's AI-written lines, so they cost no request */
-  if (pokes.length < 3){ petEvent("happy", 1600); if (now - lastPokeLine > 8000){ lastPokeLine = now; setLine(localLine(petStatsNow, "happy")); } return; }
+  if (pokes.length < 3){ petEvent("happy", 1600); if (!sayShown() || now - lastPokeLine > 8000){ lastPokeLine = now; setLine(localLine(petStatsNow, "happy")); } return; }
   const r = TOUCH[petTouch()];
   petEvent(r.state, 2600);
   if (!lineBusy && now - lastPokeLine > 2500){ lastPokeLine = now; setLine(localLine(petStatsNow, r.state)); }
@@ -189,7 +218,7 @@ $("#petCv").parentElement.onclick = () => {
   const ctx = $("#petCv").getContext("2d");
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   let f = 0, lastTag = "", skyT = null;
-  try { const l = JSON.parse(localStorage.getItem("petLine") || "null"); if (l && l.d === todayKey() && l.t) setLine(l.t); } catch (e) {}
+  try { const l = JSON.parse(localStorage.getItem("petLine") || "null"); if (l && l.d === todayKey() && l.t) setLine(l.t, false, true); } catch (e) {}
   /* the top row of the pet's head when standing still, cached per look */
   let headKey = "", headVal = 4;
   function headRow(p, look){
@@ -223,9 +252,12 @@ $("#petCv").parentElement.onclick = () => {
       if (cv.width !== W * S || cv.height !== H * S){ cv.width = W * S; cv.height = H * S; cv.style.width = W * S / dpr + "px"; cv.style.height = H * S / dpr + "px"; }
       /* the pet stands a little below the top block, never lower than the free space */
       const sp = $("#petSpace").getBoundingClientRect(), toLog = y => Math.round((y - wr.top) * dpr / S);
-      const say = $("#petSay"), sayH = say.offsetHeight + 22, head = headRow(p, look);
+      /* room for a two-line bubble is kept above the head whether the pet talks or not, so the pet does not jump */
+      const say = $("#petSay"), sayH = 92, head = headRow(p, look);
       /* room above the head for the speech bubble, then the pet, then the ground */
-      const ground = Math.max(32, Math.min(H - 2, toLog(sp.bottom), toLog(sp.top) + Math.ceil(sayH * dpr / S) + 34 - head + 2));
+      let ground = Math.max(32, Math.min(H - 2, toLog(sp.bottom), toLog(sp.top) + Math.ceil(sayH * dpr / S) + 34 - head + 2));
+      /* with the chat open, the pet stands on top of it, so it stays in sight above the chat */
+      const sh = $("#chatSheet"); if (sh.dataset.open === "true") ground = Math.max(24, Math.min(ground, toLog(sh.getBoundingClientRect().top) - 1));
       const skyTop = toLog($(".topCard").getBoundingClientRect().bottom);
       /* day and night swap through a sunset, one step every few frames */
       const want = {morning: .5, day: 0, evening: .5, night: 1}[look.tod] ?? (look.night ? 1 : 0);
@@ -233,15 +265,34 @@ $("#petCv").parentElement.onclick = () => {
       const at = PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop, sky: skyT, dawn: look.tod === "morning", noThought: true});
       /* a hungry pet shows what it wants inside its own speech bubble, one component with the words */
       sayFoodIcon(look.state === "hungry" ? sayFood($("#petSayText").textContent) || look.food || "apple" : null);
-      /* the bubble sits right above the pet's head, its tail pointing down at it */
-      /* it follows the pet as it walks and hops; near a screen edge the bubble stays on screen and its tail slides over to the pet */
-      const hr = $("#hud").getBoundingClientRect(), headY = at ? wr.top + at.y * S / dpr - hr.top : wr.top + (ground - 30 + head) * S / dpr - hr.top;
-      const cx = at ? wr.left + (at.x + .5) * S / dpr - hr.left : wr.left + (Math.floor((W - 48) / 2) + 24) * S / dpr - hr.left;
-      const bw = say.offsetWidth, left = Math.min(Math.max(cx, bw / 2 + 12), hr.width - bw / 2 - 12);
-      const top = Math.max(sp.top - hr.top, headY - sayH + 2);
+      /* the bubble sits up and to the side of the head, on the side with more room, its tail coming out of its side towards the mouth;
+         with no room at either side it sits over the head and the tail comes out of its bottom. It follows the pet as it walks and hops */
+      const hr = $("#hud").getBoundingClientRect(), k = S / dpr, ox0 = wr.left - hr.left;
+      const headY = at ? wr.top + at.y * k - hr.top : wr.top + (ground - 30 + head) * k - hr.top;
+      const cx = at ? ox0 + (at.x + .5) * k : ox0 + (Math.floor((W - 48) / 2) + 24) * k;
+      const hw = at && at.l != null ? (at.r - at.l) * k / 2 : 12 * k, tipX = hw * .45;
+      const roomR = hr.width - 12 - (cx + tipX + 21), roomL = cx - tipX - 21 - 12, MIN = 150;
+      const side = Math.max(roomR, roomL) >= MIN;
+      /* where both sides fit, it stays where it was, so it does not jump from side to side as the pet walks */
+      const right = roomR >= MIN && roomL >= MIN ? !say.classList.contains("sideL") : roomR >= roomL;
+      say.classList.toggle("sideL", !right); say.classList.toggle("above", !side);
+      say.style.maxWidth = Math.round(side ? Math.min(300, right ? roomR : roomL) : Math.min(300, hr.width - 24)) + "px";
+      const bw = say.offsetWidth, bh = say.offsetHeight;
+      let left, top;
+      if (side){
+        left = right ? cx + tipX + 21 : cx - tipX - 21 - bw;
+        top = headY - 10 - bh;
+      } else {
+        left = Math.max(12, Math.min(hr.width - 12 - bw, cx - bw / 2));
+        /* the tip lands just above the head, a little to the side of the middle, pointing down to the mouth */
+        const tl = right ? cx + tipX * .5 - left - 5 : cx - tipX * .5 - left - 25;
+        say.style.setProperty("--tl", Math.round(Math.max(0, Math.min(bw - 30, tl))) + "px");
+        top = headY - 18 - bh;
+      }
+      top = Math.max(sp.top - hr.top, top);
       say.style.top = Math.round(top) + "px"; say.style.left = Math.round(left) + "px";
-      say.style.setProperty("--tx", Math.round(Math.max(-bw / 2 + 24, Math.min(bw / 2 - 24, cx - left))) + "px"); say.style.visibility = "visible";
     }
+    if (!$("#devBtn")) devSync();
     const tag = look.stage === "egg" ? "" : (look.toy === "dance" && look.state === "play" ? "Танцует" : STATE_TAG[look.state] || "");
     if (tag !== lastTag){ const t = $("#sceneTag"); t.hidden = !tag; t.textContent = tag; lastTag = tag; }
     f++;
@@ -251,59 +302,32 @@ $("#petCv").parentElement.onclick = () => {
   /* time moves on: hunger, night, hibernation */
   setInterval(() => { if (typeof days !== "undefined") petOnRender(); }, 60000);
 })();
+
+/* ---------- when the pet talks by itself ----------
+   Besides answering taps, meals and changes of state, the pet says something now and then while its screen is open:
+   every 2–5 minutes a line from the day's AI-written set, at most every 15 minutes a fresh AI line about the moment
+   (meal time and nothing logged for hours, late night, or just how it feels). Asleep, it mumbles half as often. */
+(() => {
+  let next = Date.now() + 2500;
+  const gap = () => (120 + Math.random() * 180) * 1000;
+  setInterval(() => {
+    const now = Date.now();
+    if (now - sayAt < 20000 && sayAt) next = Math.max(next, sayAt + gap());
+    if (now < next || document.hidden || petListening || sayShown() || lineBusy) return;
+    if ($("#screens").dataset.screen !== "pet" || $("#chatSheet").dataset.open === "true" || !$("#petMenu").hidden || !$("#petDev").hidden) return;
+    next = now + gap();
+    const s = petStatsNow || {};
+    if (!pet){ if (!hatching) setLine(localLine(s, "idle")); return; }
+    if (petDemo){ setLine(localLine(s, petDemo.state)); return; }
+    const st = petState(s), h = new Date().getHours(), asleep = st === "sleep" || st === "hibernate";
+    if (asleep && Math.random() < .5) return;
+    if (sample && now - lineAt > 15 * 60000){
+      const meal = (h >= 8 && h < 10) || (h >= 13 && h < 15) || (h >= 18 && h < 20);
+      requestLine(asleep ? "timer" : meal && !(s.sinceH < 3) ? "meal" : h >= 23 || h < 5 ? "late" : "timer", true);
+    } else setLine(localLine(s, st));
+  }, 4000);
+})();
 chatBarPreview();
 
-/* ---------- chat hints written by the AI: one or two, from the time, the day and the latest messages ---------- */
-let aiChips = null, aiChipsKey = "", aiChipsBusy = false;
-function chipsKey(){
-  const msgs = chatMsgs(cur), last = msgs[msgs.length - 1];
-  return [cur, last ? last.id : "-", dayEntries(cur).length, stepsOf(cur), Math.floor(new Date().getHours() / 2)].join("|");
-}
-function localChips(){
-  return cookChipList(dayContext(cur)).slice(0, 2).map(ch => ch.q ? {label: ch.q, send: ch.q} : {label: ch.label, text: ch.fill.replace("  ", " ")});
-}
-function renderCookChips(){
-  const box = $("#cookChips"); box.replaceChildren();
-  if (chatBusy || $("#chatSheet").dataset.open !== "true") return;
-  const key = chipsKey();
-  if (key !== aiChipsKey) loadChips(key);
-  if (aiChipsBusy && !aiChips) return;
-  for (const ch of aiChips || []){
-    const b = el("button",{type:"button",class:"chip" + (ch.text ? " ghost" : ""),text: ch.label});
-    b.onclick = () => {
-      if (ch.send){ sendChat(ch.send); return; }
-      const t = $("#foodText"); t.value = ch.text; autoGrow(); t.focus();
-      const i = t.value.indexOf("…"); if (i >= 0) t.setSelectionRange(i, i + 1); else t.setSelectionRange(t.value.length, t.value.length);
-    };
-    box.append(b);
-  }
-}
-async function loadChips(key){
-  aiChipsKey = key; aiChips = null;
-  try { const c = JSON.parse(localStorage.getItem("petChips") || "null"); if (c && c.key === key && Array.isArray(c.chips)){ aiChips = c.chips; return; } } catch (e) {}
-  if (!sample){ aiChips = localChips(); return; }
-  aiChipsBusy = true; renderCookChips();
-  const c = dayContext(cur), s = petStatsNow || petStats(), st = pet ? petState(s) : "egg";
-  const msgs = chatMsgs(cur).slice(-6).map(m => (m.role === "user" ? "Человек: " : "Помощник: ") + str(m.text, 160) + ((m.actions || []).length ? " [" + m.actions.map(actionSummary).filter(Boolean).join("; ") + "]" : "")).join("\n");
-  const prompt = `Ты подбираешь подсказки-кнопки над полем ввода в чате дневника питания. Нажатие кнопки либо сразу отправляет фразу в чат, либо вставляет заготовку, которую человек допишет.
-Сейчас ${c.time}, день: ${c.isToday ? "сегодня" : label(cur)}. Съедено ${c.eatenKcal} из ${c.target} ккал, осталось ${c.left}. Белок ${c.p} из ${c.gp} г, жиры ${c.f} из ${c.gf} г.
-${c.detail.length ? "Записи дня: " + c.detail.map(x => x.replace(/^\[[^\]]*\]\s*/, "").split(". Блюда")[0]).join("; ") : "Записей за день нет."}
-${c.sinceH != null ? `Последний приём ${fmtH(c.sinceH)} назад.` : ""} ${c.sleepH != null ? `До сна ~${fmtH(c.sleepH)}.` : ""} Шаги: ${c.steps ? c.steps : "не записаны"}. Вес последний раз записан: ${Object.keys(weights).sort().pop() || "никогда"}.
-Питомец: ${pet ? pet.name + ", " + (STATE_RU[st] || st) : "ещё яйцо"}; здоровье ${s.health}, сытость ${s.food}, настроение ${s.mood}.
-Последние сообщения в чате:
-${msgs || "(чат пуст)"}
-Придумай 1–2 самые полезные подсказки именно сейчас, разные по смыслу и не повторяющие то, что человек уже сделал. Примеры типов: записать приём пищи, который по времени, скорее всего, был; спросить идею на ближайший приём под остаток ккал и белка; записать шаги вечером, если их нет; записать вес, если давно не взвешивался; уточнить запись из чата.
-Ответь только JSON: {"chips":[{"label":"текст на кнопке, до 40 символов","send":"фраза, которая уйдёт в чат"} или {"label":"…","text":"заготовка для поля ввода, место для числа отметь символом …"}]}`;
-  try {
-    const r = await sample.json(prompt, {modelTier:"quick", cache:false});
-    const list = (r && Array.isArray(r.chips) ? r.chips : []).slice(0, 2).map(x => {
-      const lab = str(x && x.label, 48);
-      if (!lab) return null;
-      if (x.text) return {label: lab, text: str(x.text, 200)};
-      return {label: lab, send: str(x.send, 300) || lab};
-    }).filter(Boolean);
-    if (aiChipsKey === key){ aiChips = list.length ? list : localChips(); try { localStorage.setItem("petChips", JSON.stringify({key, chips: aiChips})); } catch (e) {} }
-  } catch (e) {
-    if (aiChipsKey === key) aiChips = localChips();
-  } finally { aiChipsBusy = false; if (aiChipsKey === key) renderCookChips(); }
-}
+/* ---------- no hint buttons over the chat's input in the pixel version (Igor asked to drop them) ---------- */
+function renderCookChips(){ $("#cookChips").replaceChildren(); }

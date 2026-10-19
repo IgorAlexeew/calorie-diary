@@ -203,9 +203,11 @@
   window.__transcribe.model = () => audioModel || cfg().audioModel || "";
 
   /* ---------- hold-to-talk (pixel version) ----------
-     The mic buttons record while held and send on release; sliding far off the button cancels.
+     The mic buttons record while held and send on release; sliding the finger left along the lane that opens beside
+     the button cancels: on the bin at its end the lane turns red and letting go throws the message away.
      Engines: "phone" = Android speech recognition through Native.sr*, "gemini" = recording + __transcribe.
-     While held, the button shows pixel level bars and the chat bar shows what is heard. */
+     While held, the button shows pixel level bars and what is heard is typed right into the message field
+     (the chat's text box, and the chat bar on the pet screen, which looks like the same field). */
   const VOICE_KEY = "voiceEngine", DIAG_KEY = "voiceDiag";
   const lsGet = (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
@@ -216,8 +218,70 @@
   const pct = v => Math.round(v * 100) + "%";
   function voiceSay(t, err){
     const p = document.getElementById("chatPrev");
-    if (p){ p.textContent = t; p.classList.toggle("busy", !err); }
+    if (p){ p.classList.remove("live", "empty"); p.textContent = t; p.classList.toggle("busy", !err); }
     if (typeof setStatus === "function") setStatus(t, err);
+  }
+  /* what is heard goes into the message field, after anything already typed there */
+  const joinT = (a, b) => [a, b].map(x => (x || "").trim()).filter(Boolean).join(" ");
+  function voiceField(h, text){
+    h.heard = text || "";
+    const ta = document.getElementById("foodText"), all = joinT(h.base, h.heard);
+    if (ta){ ta.value = all; if (typeof autoGrow === "function") autoGrow(); ta.scrollTop = ta.scrollHeight; }
+    const p = document.getElementById("chatPrev");
+    /* one line that never grows: the newest words stay in sight */
+    if (p){ p.classList.add("live", "busy"); p.classList.toggle("empty", !all); p.textContent = all || "Говори…"; p.scrollLeft = p.scrollWidth; }
+  }
+  function voiceRestore(h, msg){
+    const ta = document.getElementById("foodText");
+    if (ta){ ta.value = h.base || ""; if (typeof autoGrow === "function") autoGrow(); }
+    const p = document.getElementById("chatPrev"); if (p) p.classList.remove("live", "empty");
+    voiceSay(msg || "");
+    if (msg) setTimeout(() => { if (!hold && typeof chatBarPreview === "function") chatBarPreview(); }, 1800);
+  }
+  /* the cancel track: while the button is held, a lane opens to the left of it with a bin at the far end; the button's
+     thumb rides along the lane under the finger, and on the bin it turns red ("отпусти — отмена") */
+  const CANCEL_PX = 120;
+  const pxI = (n, sz) => typeof pxIcon === "function" ? pxIcon(n, sz) : "";
+  function hintShow(h){
+    const el = document.getElementById("voiceHint"); if (!el) return;
+    const r = h.btn.getBoundingClientRect();
+    /* the lane covers the button exactly and runs CANCEL_PX further left; bin and thumb are both the button's size */
+    el.style.left = (r.right - CANCEL_PX - r.width) + "px";
+    el.style.top = r.top + "px";
+    el.style.height = r.height + "px";
+    el.style.width = (CANCEL_PX + r.width) + "px";
+    /* the chat bar's text stops where the lane begins */
+    const op = document.getElementById("chatOpen");
+    if (op && h.btn.id === "barMic") op.style.paddingRight = Math.max(10, Math.round(op.getBoundingClientRect().right - (r.right - CANCEL_PX - r.width) + 8)) + "px";
+    el.style.setProperty("--th", r.width + "px");
+    el.innerHTML = `<span class="vtBin">${pxI("trash", 18)}</span><span class="vtPath"><span class="vtLab"></span></span><span class="vtThumb">${pxI("mic", 18)}</span>`;
+    hintArm(h, false); hintPos(0); el.hidden = false;
+  }
+  function hintPos(dx){
+    /* in 4 px steps, and all the way onto the bin at the end */
+    const t = document.querySelector("#voiceHint .vtThumb"); if (t) t.style.transform = `translateX(${dx <= -CANCEL_PX ? -CANCEL_PX : Math.round(dx / 4) * 4}px)`;
+  }
+  function hintArm(h, on){
+    const el = document.getElementById("voiceHint"); if (!el) return;
+    el.classList.toggle("armed", on);
+    const lab = el.querySelector(".vtLab");
+    if (lab) lab.innerHTML = on ? "Отпусти" : `${pxI("chevL", 10)}${pxI("chevL", 10)} отмена`;
+    const t = el.querySelector(".vtThumb"); if (t) t.innerHTML = pxI(on ? "trash" : "mic", 18);
+    for (const id of ["chatBar", "composer"]){ const b = document.getElementById(id); if (b) b.classList.toggle("voiceCancel", on); }
+  }
+  function hintHide(){
+    const el = document.getElementById("voiceHint"); if (el) el.hidden = true;
+    const op = document.getElementById("chatOpen"); if (op) op.style.paddingRight = "";
+    for (const id of ["chatBar", "composer"]){ const b = document.getElementById(id); if (b) b.classList.remove("voiceCancel"); }
+  }
+  function voiceMove(btn, e){
+    if (!hold || hold.btn !== btn || (hold.pid != null && e.pointerId !== hold.pid)) return;
+    const dx = Math.min(0, e.clientX - hold.x), armed = dx <= -CANCEL_PX;
+    hintPos(dx);
+    if (armed !== hold.armed){
+      hold.armed = armed; hintArm(hold, armed);
+      if (navigator.vibrate) try { navigator.vibrate(armed ? 30 : 10); } catch (x) {}
+    }
   }
   /* the pet listens while the button is held: window.__petListen(true, level 0..1) / (false), provided by pet/ */
   const petListen = (on, v) => { try { if (typeof window.__petListen === "function") window.__petListen(on, v || 0); } catch (e) {} };
@@ -231,12 +295,15 @@
       b.style.height = Math.max(4, Math.round(x * h / 4) * 4) + "px";
     });
   }
+  let holdEndAt = 0;
   function endHold(){
     if (!hold) return null;
+    holdEndAt = Date.now();
     const h = hold; hold = null;
     petListen(false);
     const bar = document.getElementById("chatBar"); if (bar) bar.classList.remove("voiceHold");
     h.btn.classList.remove("holding", "rec");
+    hintHide();
     h.bars.forEach(b => b.style.height = "4px");
     if (h.timer) clearTimeout(h.timer);
     return h;
@@ -246,12 +313,15 @@
     text = (text || "").trim();
     if (!text){
       const short = h && h.dur != null && h.dur < 700;
+      if (h) voiceRestore(h);
       voiceSay(short ? "Держи кнопку, пока говоришь, и отпусти в конце." : "Не расслышал. " + (diag || ""), true);
       return;
     }
+    if (h) voiceField(h, text);
+    const all = h ? joinT(h.base, text) : text;
     voiceSay("");
     if (typeof openChat === "function") openChat(true);
-    if (typeof sendChat === "function") sendChat(text, true);
+    if (typeof sendChat === "function") sendChat(all, true);
   }
   /* phone engine: Java SpeechRecognizer; it may stop on a pause while the button is still held, then it is restarted */
   window.__native.sr = (kind, v) => {
@@ -260,10 +330,10 @@
     const join = (a, b) => [a, b].filter(Boolean).join(" ");
     if (kind === "level"){ if (h) setLevel(+v); }
     else if (kind === "granted"){ if (h) N.srStart(); }
-    else if (kind === "partial"){ ph.partial = v; if (h) voiceSay(join(ph.text, v) || "Слушаю…"); }
+    else if (kind === "partial"){ ph.partial = v; if (!ph.done) voiceField(ph.h, join(ph.text, v)); }
     else if (kind === "final"){
       ph.text = join(ph.text, v || ph.partial); ph.partial = "";
-      if (h){ N.srStart(); voiceSay(ph.text || "Слушаю…"); }
+      if (h){ N.srStart(); voiceField(h, ph.text); }
       else if (!ph.done){ ph.done = true; voiceDone(ph.h, ph.text, `Телефон: «${ph.text.slice(0, 60)}»`); }
     } else if (kind === "error"){
       const quiet = v === "6" || v === "7";
@@ -273,7 +343,7 @@
       ph.done = true;
       const text = join(ph.text, ph.partial);
       if (text || quiet || (v === "5" && !h)) voiceDone(ph.h, text, `Телефон: ${quiet ? "речь не распознана" : "ошибка " + v}`);
-      else { voiceSay("Голос не сработал: " + (SR_ERR[v] || "ошибка " + v) + ".", true); lsSet(DIAG_KEY, "Телефон: ошибка " + v); }
+      else { voiceRestore(ph.h); voiceSay("Голос не сработал: " + (SR_ERR[v] || "ошибка " + v) + ".", true); lsSet(DIAG_KEY, "Телефон: ошибка " + v); }
     }
   };
   function phoneStart(h){
@@ -291,7 +361,7 @@
   async function geminiStart(h){
     let stream;
     try { stream = await navigator.mediaDevices.getUserMedia({audio: true}); }
-    catch (e) { if (hold === h) endHold(); voiceSay("Нет доступа к микрофону. Разреши его в настройках телефона.", true); return; }
+    catch (e) { if (hold === h) endHold(); voiceRestore(h); voiceSay("Нет доступа к микрофону. Разреши его в настройках телефона.", true); return; }
     if (hold !== h){ stream.getTracks().forEach(t => t.stop()); return; }
     const AC = window.AudioContext || window.webkitAudioContext, ac = new AC();
     const an = ac.createAnalyser(); an.fftSize = 1024; ac.createMediaStreamSource(stream).connect(an);
@@ -311,13 +381,15 @@
       const blob = new Blob(r.chunks, {type: r.mr.mimeType || "audio/webm"});
       const info = `запись ${(h.dur / 1000).toFixed(1)} с, громкость ${pct(h.peak)}`;
       if (h.dur < 700) return voiceDone(h, "", "");
-      if (h.peak < 0.04) return voiceSay(`Микрофон ничего не услышал (${info}).`, true), lsSet(DIAG_KEY, "ИИ: тишина, " + info);
-      voiceSay("Распознаю голос…");
+      if (h.peak < 0.04) return voiceRestore(h), voiceSay(`Микрофон ничего не услышал (${info}).`, true), lsSet(DIAG_KEY, "ИИ: тишина, " + info);
+      voiceField(h, ""); const p = document.getElementById("chatPrev"); if (p) p.textContent = joinT(h.base, "") || "Распознаю голос…";
+      if (typeof setStatus === "function") setStatus("Распознаю голос…");
       try {
         const t = await window.__transcribe(blob);
         voiceDone(h, t, `ИИ ${window.__transcribe.model()}: ${info}${t ? ", «" + t.slice(0, 60) + "»" : ", речи не нашёл"}`);
       } catch (e) {
         const m = window.__transcribe.model();
+        voiceRestore(h);
         if (e && e.code === "no_audio"){ voiceSay(`Модель ${m} не получила звук: odirouter, похоже, не передаёт ей аудио. Переключи голос на «Телефон» в настройках.`, true); lsSet(DIAG_KEY, `ИИ ${m}: модель не получила звук, ${info}`); }
         else { const d = (e && (e.message || e.code)) || "ошибка"; voiceSay("Не получилось распознать голос: " + d, true); lsSet(DIAG_KEY, `ИИ ${m}: ${d}, ${info}`); }
       }
@@ -329,21 +401,24 @@
     e.preventDefault();
     try { btn.setPointerCapture(e.pointerId); } catch (x) {}
     const engine = voiceEngine();
-    hold = {btn, engine, t0: Date.now(), x: e.clientX, y: e.clientY, peak: 0, bars: Array.from(btn.querySelectorAll(".vu i"))};
+    const ta = document.getElementById("foodText");
+    hold = {btn, engine, pid: e.pointerId, t0: Date.now(), x: e.clientX, y: e.clientY, peak: 0, armed: false, base: ta ? ta.value : "", heard: "", bars: Array.from(btn.querySelectorAll(".vu i"))};
     btn.classList.add("holding", "rec");
     const bar = document.getElementById("chatBar"); if (bar) bar.classList.add("voiceHold");
     petListen(true, 0);
     if (navigator.vibrate) try { navigator.vibrate(15); } catch (x) {}
-    voiceSay("Слушаю… отпусти, чтобы отправить");
+    voiceField(hold, "");
+    if (typeof setStatus === "function") setStatus("Говори. Отпусти, чтобы отправить.");
+    hintShow(hold);
     hold.timer = setTimeout(() => voiceUp(btn, null), 120000);
     if (engine === "phone") phoneStart(hold); else geminiStart(hold);
   }
   function voiceUp(btn, e){
-    if (!hold || hold.btn !== btn) return;
-    const cancel = e && (e.type === "pointercancel" || Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 90);
+    if (!hold || hold.btn !== btn || (e && hold.pid != null && e.pointerId !== hold.pid)) return;
+    const cancel = e && (e.type === "pointercancel" || hold.armed || e.clientX - hold.x <= -CANCEL_PX);
     const h = endHold(); h.dur = Date.now() - h.t0;
-    if (cancel) voiceSay("Запись отменена.");
-    else if (h.engine === "phone") voiceSay("Распознаю…");
+    if (cancel) voiceRestore(h, "Запись отменена");
+    else if (h.engine === "phone" && typeof setStatus === "function") setStatus("Распознаю…");
     if (h.engine === "phone") phoneStop(h, !cancel); else geminiStop(h, !cancel);
   }
   function setupVoice(){
@@ -352,23 +427,43 @@
     const st = document.createElement("style");
     st.textContent = `.pxBtn.mic{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .pxBtn.mic .vu{position:absolute;inset:0;display:none;align-items:center;justify-content:center;gap:3px;background:var(--over);pointer-events:none}
-.pxBtn.mic.holding{animation:none;background:var(--over)}
+.pxBtn.mic.holding{animation:none;background:var(--over);transform:none;box-shadow:var(--shadow)}
 .pxBtn.mic.holding .vu{display:flex}
 .pxBtn.mic .vu i{display:block;width:4px;height:4px;background:#fff}
-.chatBar.voiceHold{align-items:flex-end}
-.chatBar.voiceHold .chatOpen{height:auto;min-height:44px;padding:8px 10px;align-items:flex-start}
-.chatBar.voiceHold .chatPrev{white-space:normal;overflow:visible;text-overflow:clip;font-size:17px;line-height:1.3;color:var(--fg)}`;
+.chatBar.voiceHold .chatPrev{text-overflow:clip;color:var(--fg)}
+.chatPrev.live::after{content:"";display:inline-block;width:2px;height:1em;margin-left:2px;vertical-align:-2px;background:currentColor;animation:vCaret 1s steps(1) infinite}
+.chatPrev.live.empty{color:var(--muted)}
+@keyframes vCaret{50%{opacity:0}}
+.voiceCancel .chatPrev,.voiceCancel textarea{opacity:.45;text-decoration:line-through}
+.voiceHint{position:fixed;z-index:60;box-sizing:border-box;background:var(--bg);border:3px solid var(--line);box-shadow:var(--shadow);pointer-events:none;font:600 14px var(--display, inherit);color:var(--muted)}
+.voiceHint .vtBin,.voiceHint .vtThumb{position:absolute;top:-3px;bottom:-3px;width:var(--th);box-sizing:border-box;display:flex;align-items:center;justify-content:center;border:3px solid var(--line)}
+.voiceHint .vtBin{left:-3px;color:var(--muted);border-right-style:dashed}
+.voiceHint .vtPath{position:absolute;inset:0 calc(var(--th) - 3px) 0 calc(var(--th) - 3px);display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden}
+.voiceHint .vtLab{display:inline-flex;align-items:center;gap:2px;animation:vLeft .8s steps(2) infinite}
+.voiceHint .vtThumb{right:-3px;background:var(--over);color:#fff}
+.voiceHint.armed .vtPath{inset:0 0 0 calc(var(--th) - 3px)}
+.voiceHint.armed{background:var(--over);color:#fff}
+.voiceHint.armed .vtBin{color:#fff}
+.voiceHint.armed .vtLab{animation:none}
+.voiceHint.armed .vtThumb{background:#fff;color:var(--over)}
+@keyframes vLeft{50%{transform:translateX(-4px)}}`;
     document.head.append(st);
+    const hint = document.createElement("div"); hint.id = "voiceHint"; hint.className = "voiceHint"; hint.hidden = true; hint.setAttribute("aria-live", "polite");
+    document.body.append(hint);
     for (const b of btns){
       b.onclick = null;
       b.setAttribute("aria-label", "Держи, чтобы записать голосовое");
       const vu = document.createElement("span"); vu.className = "vu"; vu.setAttribute("aria-hidden", "true");
       vu.innerHTML = "<i></i><i></i><i></i><i></i><i></i>"; b.append(vu);
       b.addEventListener("pointerdown", e => voiceDown(b, e));
-      b.addEventListener("pointerup", e => voiceUp(b, e));
-      b.addEventListener("pointercancel", e => voiceUp(b, e));
       b.addEventListener("contextmenu", e => e.preventDefault());
     }
+    /* if the WebView loses the pointer capture, the finger is still followed over the whole page */
+    document.addEventListener("pointermove", e => { if (hold) voiceMove(hold.btn, e); });
+    document.addEventListener("pointerup", e => { if (hold) voiceUp(hold.btn, e); });
+    document.addEventListener("pointercancel", e => { if (hold) voiceUp(hold.btn, e); });
+    /* letting go over the chat bar after a slide is not a tap on it: the click that follows a hold is swallowed */
+    document.addEventListener("click", e => { if (Date.now() - holdEndAt < 500){ e.preventDefault(); e.stopPropagation(); } }, true);
   }
 
   /* ---------- settings sheet ---------- */
