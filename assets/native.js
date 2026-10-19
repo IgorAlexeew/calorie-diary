@@ -245,19 +245,21 @@
   function hintShow(h){
     const el = document.getElementById("voiceHint"); if (!el) return;
     const r = h.btn.getBoundingClientRect();
-    el.style.right = Math.round(innerWidth - r.right) + "px";
-    el.style.top = Math.round(r.top) + "px";
-    el.style.height = Math.round(r.height) + "px";
-    el.style.width = Math.round(CANCEL_PX + r.width + 3) + "px";
+    /* the lane covers the button exactly and runs CANCEL_PX further left; bin and thumb are both the button's size */
+    el.style.left = (r.right - CANCEL_PX - r.width) + "px";
+    el.style.top = r.top + "px";
+    el.style.height = r.height + "px";
+    el.style.width = (CANCEL_PX + r.width) + "px";
     /* the chat bar's text stops where the lane begins */
     const op = document.getElementById("chatOpen");
-    if (op && h.btn.id === "barMic") op.style.paddingRight = Math.max(10, Math.round(op.getBoundingClientRect().right - (r.right - CANCEL_PX - r.width - 3) + 8)) + "px";
-    el.style.setProperty("--th", Math.round(r.width) + "px");
+    if (op && h.btn.id === "barMic") op.style.paddingRight = Math.max(10, Math.round(op.getBoundingClientRect().right - (r.right - CANCEL_PX - r.width) + 8)) + "px";
+    el.style.setProperty("--th", r.width + "px");
     el.innerHTML = `<span class="vtBin">${pxI("trash", 18)}</span><span class="vtPath"><span class="vtLab"></span></span><span class="vtThumb">${pxI("mic", 18)}</span>`;
     hintArm(h, false); hintPos(0); el.hidden = false;
   }
   function hintPos(dx){
-    const t = document.querySelector("#voiceHint .vtThumb"); if (t) t.style.transform = `translateX(${Math.round(Math.max(dx, -CANCEL_PX) / 4) * 4}px)`;
+    /* in 4 px steps, and all the way onto the bin at the end */
+    const t = document.querySelector("#voiceHint .vtThumb"); if (t) t.style.transform = `translateX(${dx <= -CANCEL_PX ? -CANCEL_PX : Math.round(dx / 4) * 4}px)`;
   }
   function hintArm(h, on){
     const el = document.getElementById("voiceHint"); if (!el) return;
@@ -425,7 +427,7 @@
     const st = document.createElement("style");
     st.textContent = `.pxBtn.mic{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .pxBtn.mic .vu{position:absolute;inset:0;display:none;align-items:center;justify-content:center;gap:3px;background:var(--over);pointer-events:none}
-.pxBtn.mic.holding{animation:none;background:var(--over)}
+.pxBtn.mic.holding{animation:none;background:var(--over);transform:none;box-shadow:var(--shadow)}
 .pxBtn.mic.holding .vu{display:flex}
 .pxBtn.mic .vu i{display:block;width:4px;height:4px;background:#fff}
 .chatBar.voiceHold .chatPrev{text-overflow:clip;color:var(--fg)}
@@ -433,11 +435,13 @@
 .chatPrev.live.empty{color:var(--muted)}
 @keyframes vCaret{50%{opacity:0}}
 .voiceCancel .chatPrev,.voiceCancel textarea{opacity:.45;text-decoration:line-through}
-.voiceHint{position:fixed;z-index:60;display:flex;align-items:stretch;box-sizing:border-box;background:var(--bg);border:3px solid var(--line);box-shadow:2px 2px 0 rgba(0,0,0,.35);pointer-events:none;font:600 15px var(--display, inherit);color:var(--muted)}
-.voiceHint .vtBin{flex:0 0 auto;box-sizing:border-box;width:var(--th);display:flex;align-items:center;justify-content:center;color:var(--muted);border-right:3px dashed var(--line)}
-.voiceHint .vtPath{flex:1;display:flex;align-items:center;justify-content:flex-start;white-space:nowrap;overflow:hidden;padding:0 var(--th) 0 6px;font-size:14px}
+.voiceHint{position:fixed;z-index:60;box-sizing:border-box;background:var(--bg);border:3px solid var(--line);box-shadow:var(--shadow);pointer-events:none;font:600 14px var(--display, inherit);color:var(--muted)}
+.voiceHint .vtBin,.voiceHint .vtThumb{position:absolute;top:-3px;bottom:-3px;width:var(--th);box-sizing:border-box;display:flex;align-items:center;justify-content:center;border:3px solid var(--line)}
+.voiceHint .vtBin{left:-3px;color:var(--muted);border-right-style:dashed}
+.voiceHint .vtPath{position:absolute;inset:0 calc(var(--th) - 3px) 0 calc(var(--th) - 3px);display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden}
 .voiceHint .vtLab{display:inline-flex;align-items:center;gap:2px;animation:vLeft .8s steps(2) infinite}
-.voiceHint .vtThumb{position:absolute;right:-3px;top:-3px;bottom:-3px;width:var(--th);box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:var(--over);color:#fff;border:3px solid var(--line)}
+.voiceHint .vtThumb{right:-3px;background:var(--over);color:#fff}
+.voiceHint.armed .vtPath{inset:0 0 0 calc(var(--th) - 3px)}
 .voiceHint.armed{background:var(--over);color:#fff}
 .voiceHint.armed .vtBin{color:#fff}
 .voiceHint.armed .vtLab{animation:none}
