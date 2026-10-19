@@ -203,8 +203,8 @@
   window.__transcribe.model = () => audioModel || cfg().audioModel || "";
 
   /* ---------- hold-to-talk (pixel version) ----------
-     The mic buttons record while held and send on release; sliding the finger left (a hint above the button says so)
-     cancels: past the line the hint turns red and letting go throws the message away.
+     The mic buttons record while held and send on release; sliding the finger left along the lane that opens beside
+     the button cancels: on the bin at its end the lane turns red and letting go throws the message away.
      Engines: "phone" = Android speech recognition through Native.sr*, "gemini" = recording + __transcribe.
      While held, the button shows pixel level bars and what is heard is typed right into the message field
      (the chat's text box, and the chat bar on the pet screen, which looks like the same field). */
@@ -237,21 +237,30 @@
     voiceSay(msg || "");
     if (msg) setTimeout(() => { if (!hold && typeof chatBarPreview === "function") chatBarPreview(); }, 1800);
   }
-  /* the cancel hint above the held button: "‹‹ влево — отмена", red "отпусти — отмена" past the line */
-  const CANCEL_PX = 100;
+  /* the cancel track: while the button is held, a lane opens to the left of it with a bin at the far end; the button's
+     thumb rides along the lane under the finger, and on the bin it turns red ("отпусти — отмена") */
+  const CANCEL_PX = 140;
   const pxI = (n, sz) => typeof pxIcon === "function" ? pxIcon(n, sz) : "";
   function hintShow(h){
     const el = document.getElementById("voiceHint"); if (!el) return;
-    /* above the chat bar's button; in the open chat, beside the button, so it does not cover the text being typed */
-    const r = h.btn.getBoundingClientRect(), side = h.btn.id === "micBtn";
-    el.style.right = Math.max(8, Math.round(innerWidth - (side ? r.left - 8 : r.right))) + "px";
-    el.style.bottom = Math.round(innerHeight - (side ? r.bottom - (r.height - 30) / 2 : r.top - 8)) + "px";
-    hintArm(h, false); el.hidden = false;
+    const r = h.btn.getBoundingClientRect();
+    el.style.right = Math.round(innerWidth - r.right) + "px";
+    el.style.top = Math.round(r.top) + "px";
+    el.style.height = Math.round(r.height) + "px";
+    el.style.width = Math.round(CANCEL_PX + r.width + 6) + "px";
+    el.style.setProperty("--th", Math.round(r.width) + "px");
+    el.innerHTML = `<span class="vtBin">${pxI("trash", 18)}</span><span class="vtPath"><span class="vtLab"></span></span><span class="vtThumb">${pxI("mic", 18)}</span>`;
+    hintArm(h, false); hintPos(0); el.hidden = false;
+  }
+  function hintPos(dx){
+    const t = document.querySelector("#voiceHint .vtThumb"); if (t) t.style.transform = `translateX(${Math.round(Math.max(dx, -CANCEL_PX) / 4) * 4}px)`;
   }
   function hintArm(h, on){
     const el = document.getElementById("voiceHint"); if (!el) return;
     el.classList.toggle("armed", on);
-    el.innerHTML = on ? `${pxI("trash", 14)}<span>Отпусти — отмена</span>` : `<span class="arr">${pxI("chevL", 12)}${pxI("chevL", 12)}</span><span>Влево — отмена</span>`;
+    const lab = el.querySelector(".vtLab");
+    if (lab) lab.innerHTML = on ? "Отпусти — отмена" : `${pxI("chevL", 10)}${pxI("chevL", 10)} отмена`;
+    const t = el.querySelector(".vtThumb"); if (t) t.innerHTML = pxI(on ? "trash" : "mic", 18);
     for (const id of ["chatBar", "composer"]){ const b = document.getElementById(id); if (b) b.classList.toggle("voiceCancel", on); }
   }
   function hintHide(){
@@ -259,9 +268,9 @@
     for (const id of ["chatBar", "composer"]){ const b = document.getElementById(id); if (b) b.classList.remove("voiceCancel"); }
   }
   function voiceMove(btn, e){
-    if (!hold || hold.btn !== btn) return;
+    if (!hold || hold.btn !== btn || (hold.pid != null && e.pointerId !== hold.pid)) return;
     const dx = Math.min(0, e.clientX - hold.x), armed = dx <= -CANCEL_PX;
-    btn.style.transform = `translateX(${Math.round(Math.max(dx, -CANCEL_PX - 24) / 4) * 4}px)`;
+    hintPos(dx);
     if (armed !== hold.armed){
       hold.armed = armed; hintArm(hold, armed);
       if (navigator.vibrate) try { navigator.vibrate(armed ? 30 : 10); } catch (x) {}
@@ -284,7 +293,7 @@
     const h = hold; hold = null;
     petListen(false);
     const bar = document.getElementById("chatBar"); if (bar) bar.classList.remove("voiceHold");
-    h.btn.classList.remove("holding", "rec"); h.btn.style.transform = "";
+    h.btn.classList.remove("holding", "rec");
     hintHide();
     h.bars.forEach(b => b.style.height = "4px");
     if (h.timer) clearTimeout(h.timer);
@@ -384,7 +393,7 @@
     try { btn.setPointerCapture(e.pointerId); } catch (x) {}
     const engine = voiceEngine();
     const ta = document.getElementById("foodText");
-    hold = {btn, engine, t0: Date.now(), x: e.clientX, y: e.clientY, peak: 0, armed: false, base: ta ? ta.value : "", heard: "", bars: Array.from(btn.querySelectorAll(".vu i"))};
+    hold = {btn, engine, pid: e.pointerId, t0: Date.now(), x: e.clientX, y: e.clientY, peak: 0, armed: false, base: ta ? ta.value : "", heard: "", bars: Array.from(btn.querySelectorAll(".vu i"))};
     btn.classList.add("holding", "rec");
     const bar = document.getElementById("chatBar"); if (bar) bar.classList.add("voiceHold");
     petListen(true, 0);
@@ -396,7 +405,7 @@
     if (engine === "phone") phoneStart(hold); else geminiStart(hold);
   }
   function voiceUp(btn, e){
-    if (!hold || hold.btn !== btn) return;
+    if (!hold || hold.btn !== btn || (e && hold.pid != null && e.pointerId !== hold.pid)) return;
     const cancel = e && (e.type === "pointercancel" || hold.armed || e.clientX - hold.x <= -CANCEL_PX);
     const h = endHold(); h.dur = Date.now() - h.t0;
     if (cancel) voiceRestore(h, "Запись отменена");
@@ -419,10 +428,16 @@
 .chatPrev.live.empty{color:var(--muted)}
 @keyframes vCaret{50%{opacity:0}}
 .voiceCancel .chatPrev,.voiceCancel textarea{opacity:.45;text-decoration:line-through}
-.pxBtn.mic{transition:transform .05s steps(1)}
-.voiceHint{position:fixed;z-index:60;display:flex;align-items:center;gap:6px;padding:4px 8px;font:600 15px var(--display, inherit);background:var(--fg);color:var(--bg);border:2px solid var(--line);box-shadow:2px 2px 0 rgba(0,0,0,.35);pointer-events:none;white-space:nowrap}
-.voiceHint .arr{display:inline-flex;animation:vLeft .8s steps(2) infinite}
+.chatBar.voiceHold .chatOpen{padding-bottom:52px}
+.voiceHint{position:fixed;z-index:60;display:flex;align-items:stretch;box-sizing:border-box;background:var(--bg);border:3px solid var(--line);box-shadow:2px 2px 0 rgba(0,0,0,.35);pointer-events:none;font:600 15px var(--display, inherit);color:var(--muted)}
+.voiceHint .vtBin{flex:0 0 auto;width:calc(var(--th) - 6px);display:flex;align-items:center;justify-content:center;color:var(--muted);border-right:3px dashed var(--line)}
+.voiceHint .vtPath{flex:1;display:flex;align-items:center;justify-content:flex-start;white-space:nowrap;overflow:hidden;padding:0 var(--th) 0 8px}
+.voiceHint .vtLab{display:inline-flex;align-items:center;gap:2px;animation:vLeft .8s steps(2) infinite}
+.voiceHint .vtThumb{position:absolute;right:-3px;top:-3px;bottom:-3px;width:var(--th);box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:var(--over);color:#fff;border:3px solid var(--line)}
 .voiceHint.armed{background:var(--over);color:#fff}
+.voiceHint.armed .vtBin{color:#fff}
+.voiceHint.armed .vtLab{animation:none}
+.voiceHint.armed .vtThumb{background:#fff;color:var(--over)}
 @keyframes vLeft{50%{transform:translateX(-4px)}}`;
     document.head.append(st);
     const hint = document.createElement("div"); hint.id = "voiceHint"; hint.className = "voiceHint"; hint.hidden = true; hint.setAttribute("aria-live", "polite");
@@ -433,11 +448,12 @@
       const vu = document.createElement("span"); vu.className = "vu"; vu.setAttribute("aria-hidden", "true");
       vu.innerHTML = "<i></i><i></i><i></i><i></i><i></i>"; b.append(vu);
       b.addEventListener("pointerdown", e => voiceDown(b, e));
-      b.addEventListener("pointermove", e => voiceMove(b, e));
-      b.addEventListener("pointerup", e => voiceUp(b, e));
-      b.addEventListener("pointercancel", e => voiceUp(b, e));
       b.addEventListener("contextmenu", e => e.preventDefault());
     }
+    /* if the WebView loses the pointer capture, the finger is still followed over the whole page */
+    document.addEventListener("pointermove", e => { if (hold) voiceMove(hold.btn, e); });
+    document.addEventListener("pointerup", e => { if (hold) voiceUp(hold.btn, e); });
+    document.addEventListener("pointercancel", e => { if (hold) voiceUp(hold.btn, e); });
   }
 
   /* ---------- settings sheet ---------- */
