@@ -372,6 +372,8 @@ h3{font-size:16px;margin:6px 0 0}
 .goal{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;font:600 15px var(--display);color:var(--muted)}
 
 .stats .ico{color:var(--c)}
+.stats .devBtn{display:inline-flex;align-items:center;justify-content:center;gap:6px;align-self:center;font:600 15px var(--display);color:var(--fg);background:none;border:2px dashed var(--muted);padding:4px 8px}
+.stats .devBtn[hidden]{display:none}
 .stats .val{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
 .seg{display:grid;grid-template-columns:repeat(var(--n,10),1fr);gap:2px;height:14px}
 .seg i{background:var(--track)}
@@ -637,7 +639,7 @@ svg text{font-size-adjust:.5!important}
     </div>
   </div>
 
-  <!-- hidden developer view: 7 taps on «Если тыкать» in the pet menu -->
+  <!-- developer view: opened by the «Просмотр» button on the state panel, which 7 taps on «Если тыкать» in the pet menu turn on -->
   <div class="modal" id="petDev" hidden role="dialog" aria-modal="true" aria-labelledby="pdTitle">
     <div class="modalBox px">
       <div class="modalHead"><h2 id="pdTitle">Просмотр</h2><button type="button" class="pxBtn" id="pdClose" aria-label="Закрыть"></button></div>
@@ -648,6 +650,7 @@ svg text{font-size-adjust:.5!important}
       <div class="pmDemo" id="pmAge"></div>
       <h4>Время суток</h4>
       <div class="pmDemo" id="pmTime"></div>
+      <button type="button" class="small" id="pdOff">Выключить режим разработчика</button>
     </div>
   </div>
 </div>
@@ -3035,14 +3038,32 @@ function closeMenu(){ $("#petMenu").hidden = true; $("#petDev").hidden = true; }
 $("#pmClose").innerHTML = pxIcon("close", 14); $("#pdClose").innerHTML = pxIcon("close", 14);
 $("#pmClose").onclick = closeMenu; $("#pdClose").onclick = closeMenu;
 for (const id of ["#petMenu", "#petDev"]) $(id).addEventListener("click", e => { if (e.target === e.currentTarget) closeMenu(); });
-/* the developer view (state, age and time of day previews) is hidden: 7 quick taps on «Если тыкать» open it */
+/* developer mode (state, age and time of day previews): 7 quick taps on «Если тыкать» in the pet menu turn it on,
+   then a «Просмотр» button sits in the free cell of the state panel and opens the preview window; it can be turned off there */
+const devOn = () => { try { return localStorage.getItem("petDevMode") === "1"; } catch (e) { return false; } };
+function devSet(on){ try { localStorage.setItem("petDevMode", on ? "1" : ""); } catch (e) {} devSync(); }
+function devSync(){
+  const box = $("#petStats"); if (!box.children.length) return;
+  let b = $("#devBtn");
+  if (!b){
+    b = el("button",{type:"button", class:"devBtn", id:"devBtn"}); b.innerHTML = pxIcon("edit", 14) + "<span>Просмотр</span>";
+    b.onclick = () => { $("#petDev").hidden = false; };
+    box.append(b);
+  }
+  b.hidden = !devOn();
+}
 let devTaps = [];
 function devTap(){
   const now = Date.now(); devTaps = devTaps.filter(t => now - t < 3000); devTaps.push(now);
-  if (devTaps.length >= 7){ devTaps = []; $("#petMenu").hidden = true; $("#petDev").hidden = false; }
+  if (devTaps.length < 7) return;
+  devTaps = [];
+  const was = devOn(); devSet(true);
+  const old = $("#petMenu .devNote"); if (old) old.remove();
+  $("#pmInfo").after(el("p",{class:"hint devNote", text: was ? "Режим разработчика уже включён: кнопка «Просмотр» на панели состояния." : "Режим разработчика включён: кнопка «Просмотр» теперь на панели состояния."}));
 }
+$("#pdOff").onclick = () => { devSet(false); closeMenu(); };
 $("#petMenuBtn").onclick = () => {
-  const info = $("#pmInfo"); info.replaceChildren();
+  const info = $("#pmInfo"); info.replaceChildren(); const note = $("#petMenu .devNote"); if (note) note.remove();
   const s = petStatsNow || petStats(), age = petAge(), stage = petStage(age), br = petBranch(s, stage);
   const rows = pet ? [["Имя", pet.name], ["Характер", pet.trait || "—"], ["Если тыкать", TOUCH[petTouch()].ru.split(":")[0]], ["Стадия", `${STAGE_RU[stage]}, дней с записями: ${age}`],
     ["Ветка", br ? `${BRANCH_RU[br][0]}: ${BRANCH_RU[br][1]}` : "появится с 7 дней"], ["Опыт", `${petXp()}, уровень ${petLevel(petXp())}`],
@@ -3198,6 +3219,7 @@ $("#petCv").parentElement.onclick = () => {
       top = Math.max(sp.top - hr.top, top);
       say.style.top = Math.round(top) + "px"; say.style.left = Math.round(left) + "px";
     }
+    if (!$("#devBtn")) devSync();
     const tag = look.stage === "egg" ? "" : (look.toy === "dance" && look.state === "play" ? "Танцует" : STATE_TAG[look.state] || "");
     if (tag !== lastTag){ const t = $("#sceneTag"); t.hidden = !tag; t.textContent = tag; lastTag = tag; }
     f++;

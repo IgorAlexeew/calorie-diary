@@ -125,6 +125,8 @@ h3{font-size:16px;margin:6px 0 0}
 .goal{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;font:600 15px var(--display);color:var(--muted)}
 
 .stats .ico{color:var(--c)}
+.stats .devBtn{display:inline-flex;align-items:center;justify-content:center;gap:6px;align-self:center;font:600 15px var(--display);color:var(--fg);background:none;border:2px dashed var(--muted);padding:4px 8px}
+.stats .devBtn[hidden]{display:none}
 .stats .val{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
 .seg{display:grid;grid-template-columns:repeat(var(--n,10),1fr);gap:2px;height:14px}
 .seg i{background:var(--track)}
