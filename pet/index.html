@@ -418,7 +418,8 @@ select{background-image:none;border:2px solid var(--line);padding-right:12px}
 .chatPrev{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px;color:var(--muted)}
 .chatPrev.busy{color:var(--fg)}
 .chatBody{display:none}
-.chatSheet[data-open="true"]{height:min(88dvh,calc(100dvh - 24px))}
+/* the open chat leaves the upper part of the screen to the pet, which stands on the chat's top edge */
+.chatSheet[data-open="true"]{height:min(60dvh,calc(100dvh - 24px))}
 .chatSheet[data-open="true"] .chatBar{display:none}
 .chatSheet[data-open="true"] .chatBody{display:flex;flex:1;min-height:0}
 .chatPanel{gap:10px}
@@ -3143,7 +3144,9 @@ $("#petCv").parentElement.onclick = () => {
       /* room for a two-line bubble is kept above the head whether the pet talks or not, so the pet does not jump */
       const say = $("#petSay"), sayH = 92, head = headRow(p, look);
       /* room above the head for the speech bubble, then the pet, then the ground */
-      const ground = Math.max(32, Math.min(H - 2, toLog(sp.bottom), toLog(sp.top) + Math.ceil(sayH * dpr / S) + 34 - head + 2));
+      let ground = Math.max(32, Math.min(H - 2, toLog(sp.bottom), toLog(sp.top) + Math.ceil(sayH * dpr / S) + 34 - head + 2));
+      /* with the chat open, the pet stands on top of it, so it stays in sight above the chat */
+      const sh = $("#chatSheet"); if (sh.dataset.open === "true") ground = Math.max(24, Math.min(ground, toLog(sh.getBoundingClientRect().top) - 1));
       const skyTop = toLog($(".topCard").getBoundingClientRect().bottom);
       /* day and night swap through a sunset, one step every few frames */
       const want = {morning: .5, day: 0, evening: .5, night: 1}[look.tod] ?? (look.night ? 1 : 0);
@@ -3214,59 +3217,7 @@ $("#petCv").parentElement.onclick = () => {
 })();
 chatBarPreview();
 
-/* ---------- chat hints written by the AI: one or two, from the time, the day and the latest messages ---------- */
-let aiChips = null, aiChipsKey = "", aiChipsBusy = false;
-function chipsKey(){
-  const msgs = chatMsgs(cur), last = msgs[msgs.length - 1];
-  return [cur, last ? last.id : "-", dayEntries(cur).length, stepsOf(cur), Math.floor(new Date().getHours() / 2)].join("|");
-}
-function localChips(){
-  return cookChipList(dayContext(cur)).slice(0, 2).map(ch => ch.q ? {label: ch.q, send: ch.q} : {label: ch.label, text: ch.fill.replace("  ", " ")});
-}
-function renderCookChips(){
-  const box = $("#cookChips"); box.replaceChildren();
-  if (chatBusy || $("#chatSheet").dataset.open !== "true") return;
-  const key = chipsKey();
-  if (key !== aiChipsKey) loadChips(key);
-  if (aiChipsBusy && !aiChips) return;
-  for (const ch of aiChips || []){
-    const b = el("button",{type:"button",class:"chip" + (ch.text ? " ghost" : ""),text: ch.label});
-    b.onclick = () => {
-      if (ch.send){ sendChat(ch.send); return; }
-      const t = $("#foodText"); t.value = ch.text; autoGrow(); t.focus();
-      const i = t.value.indexOf("…"); if (i >= 0) t.setSelectionRange(i, i + 1); else t.setSelectionRange(t.value.length, t.value.length);
-    };
-    box.append(b);
-  }
-}
-async function loadChips(key){
-  aiChipsKey = key; aiChips = null;
-  try { const c = JSON.parse(localStorage.getItem("petChips") || "null"); if (c && c.key === key && Array.isArray(c.chips)){ aiChips = c.chips; return; } } catch (e) {}
-  if (!sample){ aiChips = localChips(); return; }
-  aiChipsBusy = true; renderCookChips();
-  const c = dayContext(cur), s = petStatsNow || petStats(), st = pet ? petState(s) : "egg";
-  const msgs = chatMsgs(cur).slice(-6).map(m => (m.role === "user" ? "Человек: " : "Помощник: ") + str(m.text, 160) + ((m.actions || []).length ? " [" + m.actions.map(actionSummary).filter(Boolean).join("; ") + "]" : "")).join("\n");
-  const prompt = `Ты подбираешь подсказки-кнопки над полем ввода в чате дневника питания. Нажатие кнопки либо сразу отправляет фразу в чат, либо вставляет заготовку, которую человек допишет.
-Сейчас ${c.time}, день: ${c.isToday ? "сегодня" : label(cur)}. Съедено ${c.eatenKcal} из ${c.target} ккал, осталось ${c.left}. Белок ${c.p} из ${c.gp} г, жиры ${c.f} из ${c.gf} г.
-${c.detail.length ? "Записи дня: " + c.detail.map(x => x.replace(/^\[[^\]]*\]\s*/, "").split(". Блюда")[0]).join("; ") : "Записей за день нет."}
-${c.sinceH != null ? `Последний приём ${fmtH(c.sinceH)} назад.` : ""} ${c.sleepH != null ? `До сна ~${fmtH(c.sleepH)}.` : ""} Шаги: ${c.steps ? c.steps : "не записаны"}. Вес последний раз записан: ${Object.keys(weights).sort().pop() || "никогда"}.
-Питомец: ${pet ? pet.name + ", " + (STATE_RU[st] || st) : "ещё яйцо"}; здоровье ${s.health}, сытость ${s.food}, настроение ${s.mood}.
-Последние сообщения в чате:
-${msgs || "(чат пуст)"}
-Придумай 1–2 самые полезные подсказки именно сейчас, разные по смыслу и не повторяющие то, что человек уже сделал. Примеры типов: записать приём пищи, который по времени, скорее всего, был; спросить идею на ближайший приём под остаток ккал и белка; записать шаги вечером, если их нет; записать вес, если давно не взвешивался; уточнить запись из чата.
-Ответь только JSON: {"chips":[{"label":"текст на кнопке, до 40 символов","send":"фраза, которая уйдёт в чат"} или {"label":"…","text":"заготовка для поля ввода, место для числа отметь символом …"}]}`;
-  try {
-    const r = await sample.json(prompt, {modelTier:"quick", cache:false});
-    const list = (r && Array.isArray(r.chips) ? r.chips : []).slice(0, 2).map(x => {
-      const lab = str(x && x.label, 48);
-      if (!lab) return null;
-      if (x.text) return {label: lab, text: str(x.text, 200)};
-      return {label: lab, send: str(x.send, 300) || lab};
-    }).filter(Boolean);
-    if (aiChipsKey === key){ aiChips = list.length ? list : localChips(); try { localStorage.setItem("petChips", JSON.stringify({key, chips: aiChips})); } catch (e) {} }
-  } catch (e) {
-    if (aiChipsKey === key) aiChips = localChips();
-  } finally { aiChipsBusy = false; if (aiChipsKey === key) renderCookChips(); }
-}
+/* ---------- no hint buttons over the chat's input in the pixel version (Igor asked to drop them) ---------- */
+function renderCookChips(){ $("#cookChips").replaceChildren(); }
 </script>
 </body></html>

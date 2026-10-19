@@ -171,7 +171,8 @@ select{background-image:none;border:2px solid var(--line);padding-right:12px}
 .chatPrev{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px;color:var(--muted)}
 .chatPrev.busy{color:var(--fg)}
 .chatBody{display:none}
-.chatSheet[data-open="true"]{height:min(88dvh,calc(100dvh - 24px))}
+/* the open chat leaves the upper part of the screen to the pet, which stands on the chat's top edge */
+.chatSheet[data-open="true"]{height:min(60dvh,calc(100dvh - 24px))}
 .chatSheet[data-open="true"] .chatBar{display:none}
 .chatSheet[data-open="true"] .chatBody{display:flex;flex:1;min-height:0}
 .chatPanel{gap:10px}
