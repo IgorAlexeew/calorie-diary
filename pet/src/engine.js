@@ -487,6 +487,9 @@
     /* where the top of the head is, in world pixels: the speech bubble follows it */
     const headTop = Math.max(0, grid.findIndex(r => r.some(Boolean)));
     const anchor = {x: Math.floor((W - 48) / 2) + ox + (grid.midX != null ? grid.midX : 16), y: gy - 34 + oy + headTop};
+    /* the body's left and right edges, so the bubble can stand beside the pet */
+    let lx = 99, rx = -1; grid.forEach(row => row.forEach((c, x) => { if (c){ lx = Math.min(lx, x); rx = Math.max(rx, x); } }));
+    if (rx >= 0){ anchor.l = Math.floor((W - 48) / 2) + ox + lx; anchor.r = Math.floor((W - 48) / 2) + ox + rx + 1; }
     /* listening (the voice button is held): sound bars on both sides of the head follow the voice */
     if (st === "listen"){
       const mx = ox + (grid.midX != null ? grid.midX : 16), v = Math.max(0, Math.min(1, look.listen || 0)), cy = oy + headTop + 5;

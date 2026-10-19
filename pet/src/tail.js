@@ -234,20 +234,20 @@ $("#petCv").parentElement.onclick = () => {
       const at = PetEngine.draw(ctx, p, look, f, {scale: S, W, H, ground, skyTop, sky: skyT, dawn: look.tod === "morning", noThought: true});
       /* a hungry pet shows what it wants inside its own speech bubble, one component with the words */
       sayFoodIcon(look.state === "hungry" ? sayFood($("#petSayText").textContent) || look.food || "apple" : null);
-      /* the bubble sits beside the pet's head, on the side with more room, its tail coming out of its side towards the head;
+      /* the bubble stands beside the pet, on the side with more room, its tail pointing at the pet's side at face level;
          it follows the pet as it walks and hops and swaps sides when the pet gets near an edge */
-      const hr = $("#hud").getBoundingClientRect(), headY = at ? wr.top + at.y * S / dpr - hr.top : wr.top + (ground - 30 + head) * S / dpr - hr.top;
-      const cx = at ? wr.left + (at.x + .5) * S / dpr - hr.left : wr.left + (Math.floor((W - 48) / 2) + 24) * S / dpr - hr.left;
-      /* the tail's tip (24 px wide, slanting 18 px down) lands on the top of the head; the bubble goes to the side with more room */
-      const roomR = hr.width - 12 - (cx - 10), roomL = cx + 10 - 12;
+      const hr = $("#hud").getBoundingClientRect(), k = S / dpr, ox0 = wr.left - hr.left;
+      const headY = at ? wr.top + at.y * k - hr.top : wr.top + (ground - 30 + head) * k - hr.top;
+      const cx = at ? ox0 + (at.x + .5) * k : ox0 + (Math.floor((W - 48) / 2) + 24) * k;
+      const eL = at && at.l != null ? ox0 + at.l * k : cx - 12 * k, eR = at && at.r != null ? ox0 + at.r * k : cx + 12 * k;
+      const roomR = hr.width - 12 - (eR + 24), roomL = eL - 24 - 12;
       const right = say.classList.contains("sideL") ? roomR > roomL + 40 : roomR >= roomL - 40;
       say.classList.toggle("sideL", !right);
-      say.style.maxWidth = Math.round(Math.min(300, hr.width - 24, Math.max(190, (right ? roomR : roomL)))) + "px";
+      say.style.maxWidth = Math.round(Math.min(300, Math.max(120, right ? roomR : roomL))) + "px";
       const bw = say.offsetWidth, bh = say.offsetHeight;
-      const left = Math.max(12, Math.min(hr.width - 12 - bw, right ? cx - 10 : cx + 10 - bw));
-      const tl = Math.max(0, Math.min(bw - 30, right ? cx - left - 5 : cx - left - 25));
-      say.style.setProperty("--tl", Math.round(tl) + "px");
-      const top = Math.max(sp.top - hr.top, headY - bh - 16);
+      const left = Math.max(12, Math.min(hr.width - 12 - bw, right ? eR + 24 : eL - 24 - bw));
+      /* the tail's tip is 18 px above the bubble's bottom; it lands a little below the top of the head */
+      const top = Math.max(sp.top - hr.top, headY + 4 * k + 18 - bh);
       say.style.top = Math.round(top) + "px"; say.style.left = Math.round(left) + "px";
     }
     const tag = look.stage === "egg" ? "" : (look.toy === "dance" && look.state === "play" ? "Танцует" : STATE_TAG[look.state] || "");
